@@ -1,0 +1,306 @@
+{
+  "original": "../cpp/moveit.cpp",
+  "sha256": "77a82cc206ade4fb5934428dba7aeb40f92ef3f807a343e5d6bac6462d4911e8",
+  "classes": {
+    "Database": {
+      "header": "include/database.hpp",
+      "implementation": "src/database.cpp",
+      "methods": [
+        {
+          "name": "find",
+          "header_only_template": true,
+          "body_sha256": "061e25e39b8885674f674eb04231aa9af53bf7b5cc7fd9bae0daefdfd6aa46d5"
+        },
+        {
+          "name": "station",
+          "header_only_template": false,
+          "body_sha256": "72c4b5999b977234d30b13832c7f5f34fbe8d6e52015a480e0115f6464d105da"
+        },
+        {
+          "name": "user",
+          "header_only_template": false,
+          "body_sha256": "650329964a72f6539a277056ee4206279faeeaab422d0793678aa48cd476a0d8"
+        },
+        {
+          "name": "driver",
+          "header_only_template": false,
+          "body_sha256": "bdda5da674499342a7557d8c0b589c0f52bd0c9b8f4a2069936da6034a1bbc06"
+        },
+        {
+          "name": "vehicle",
+          "header_only_template": false,
+          "body_sha256": "81110495332f3dadce1b9763d47663d14e18494eb173c684b4da800f94209981"
+        },
+        {
+          "name": "route",
+          "header_only_template": false,
+          "body_sha256": "6738a87959a1894d3cd9f4d06a26629f8158cdf0053936bbd459469f32c5dea1"
+        },
+        {
+          "name": "trip",
+          "header_only_template": false,
+          "body_sha256": "e2a1e754a1c1ff8158362a7281bbd316ce0cd8a5f1ca59fede7c334ccc2b76eb"
+        },
+        {
+          "name": "booking",
+          "header_only_template": false,
+          "body_sha256": "d5740e0ddc48d351b7201dc406bae4f9ba3485995734073b91355e1a7609bab3"
+        },
+        {
+          "name": "userByEmail",
+          "header_only_template": false,
+          "body_sha256": "96e2f9efd1f2e2c3c605a0b1413ac2873145c0aa5e937fc62963cc7bc410a37d"
+        },
+        {
+          "name": "capacityOf",
+          "header_only_template": false,
+          "body_sha256": "93dc5586bb44f88996cf66d9435ccce180a5c35c1b2c039e900eff843187d033"
+        },
+        {
+          "name": "addStation",
+          "header_only_template": false,
+          "body_sha256": "b591dcd8b9da41376f6780d603a7ab7be23bda6c193e7540423348224e41e8c8"
+        },
+        {
+          "name": "addUser",
+          "header_only_template": false,
+          "body_sha256": "63a46e8658f62b317380a0c86700d787b6cc029a3cfcae83bdd606e83afe654a"
+        },
+        {
+          "name": "addDriver",
+          "header_only_template": false,
+          "body_sha256": "4cb609aade3cdca891818d1c2fbab35b46852abe4b369942642880c144906e2c"
+        },
+        {
+          "name": "addVehicle",
+          "header_only_template": false,
+          "body_sha256": "e204c70715bc1108436193abb2d44eebd6edb61aae749ae3604391aad121b2cf"
+        },
+        {
+          "name": "addRoute",
+          "header_only_template": false,
+          "body_sha256": "e6cad4a21d827bd5a3ec208f0fa0f1b86a34717a94206dd92806b2f80bc04f0f"
+        },
+        {
+          "name": "addTrip",
+          "header_only_template": false,
+          "body_sha256": "fba085ddbdbfe24046b7ab02a95e8fed5cab610ce80bbace762ecb871c5570ee"
+        },
+        {
+          "name": "insertBooking",
+          "header_only_template": false,
+          "body_sha256": "4a60336178586bdc6be163131e7f2c14db6f38f6197c574e9e15921a50244306"
+        },
+        {
+          "name": "setBookingStatus",
+          "header_only_template": false,
+          "body_sha256": "cfd9add43bd09db7e7a569f4972871e6bd861693ce4605da1783d4c15e517430"
+        },
+        {
+          "name": "deleteBooking",
+          "header_only_template": false,
+          "body_sha256": "6fda423045283f7968439d72460f62ce62160dffaf1547603f878548e746111b"
+        },
+        {
+          "name": "seed",
+          "header_only_template": false,
+          "body_sha256": "2d7ffee4b22ebbd31d3a7c356c615466a5c2001f8965f7649d4c68e3c815b5a7"
+        }
+      ]
+    },
+    "Notifier": {
+      "header": "include/notifications.hpp",
+      "implementation": "src/notifications.cpp",
+      "methods": [
+        {
+          "name": "Notifier",
+          "header_only_template": false,
+          "body_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        },
+        {
+          "name": "send",
+          "header_only_template": false,
+          "body_sha256": "17712f6b7854e0f60c4baebb32ac9974f79cd664e714cb3327a930e59556ec69"
+        },
+        {
+          "name": "requestReceived",
+          "header_only_template": false,
+          "body_sha256": "74bb28f769208a9253c55565c04c42cd7b0c29e931095e184cedeaba8d3c9395"
+        },
+        {
+          "name": "waitOrAlternative",
+          "header_only_template": false,
+          "body_sha256": "8e21f44a937c373d6982990b85ed796829858db15623f823b59936959094a719"
+        },
+        {
+          "name": "bookingConfirmed",
+          "header_only_template": false,
+          "body_sha256": "2cdf6a4cbd2c8875b75e39d177e1433e4086b55e64d6365d9bcb9668466f6d7e"
+        }
+      ]
+    },
+    "BookingService": {
+      "header": "include/booking_service.hpp",
+      "implementation": "src/booking_service.cpp",
+      "methods": [
+        {
+          "name": "BookingService",
+          "header_only_template": false,
+          "body_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        },
+        {
+          "name": "nearbyStations",
+          "header_only_template": false,
+          "body_sha256": "747829b980f94c05828944c7844ad6977b2f180e237b6ba221cad8e591860353"
+        },
+        {
+          "name": "evaluateDemand",
+          "header_only_template": false,
+          "body_sha256": "05daca88ca8026c81467d676780baf9b998bad7cfce4ab8abed4a919bead1467"
+        },
+        {
+          "name": "bookSpecificTrip",
+          "header_only_template": false,
+          "body_sha256": "5d79fa1a6cd2918e78d20717890eb711b9ce59a571e2f3218b37e3c34eb7b683"
+        },
+        {
+          "name": "directTrips",
+          "header_only_template": false,
+          "body_sha256": "9fe6231a8d760ee81299ca7d998f1d96010142dd8a6ecc19c7247974c391d393"
+        },
+        {
+          "name": "processRideRequest",
+          "header_only_template": false,
+          "body_sha256": "5b5ed83241fe8157eb89faa6c8b32ee1df74ff002e1c4f6af070f8c67219e24d"
+        },
+        {
+          "name": "scheduleBatch",
+          "header_only_template": false,
+          "body_sha256": "9196738aeba94cd95ef1c1d4710efc5508d8de04f76f661b8beac48bef0fbb83"
+        }
+      ]
+    },
+    "App": {
+      "header": "include/application.hpp",
+      "implementation": "src/application.cpp",
+      "methods": [
+        {
+          "name": "isAdmin",
+          "header_only_template": false,
+          "body_sha256": "b3e4d594cd747261cd400c7fa22eeb7975a25518824c34f8f1e2cbd1e0def7de"
+        },
+        {
+          "name": "listStations",
+          "header_only_template": false,
+          "body_sha256": "8c4252c1bddf9e83c4a0390008f4356e7e8b108f3a2313741682560a5cf0df52"
+        },
+        {
+          "name": "listTrips",
+          "header_only_template": false,
+          "body_sha256": "1d743f1bc545eceb6efb5ca31516d8330474b1c50f16c198f6c104c2df0dd175"
+        },
+        {
+          "name": "printBooking",
+          "header_only_template": false,
+          "body_sha256": "26f9eb901b407a75d0ad2d36bc53f15b5272649690b9335eb78e2670faf44796"
+        },
+        {
+          "name": "myBookings",
+          "header_only_template": false,
+          "body_sha256": "ec9cefc9c6353e0a62042df38a32fd033c12cc58630da8999d4fde9c946442a1"
+        },
+        {
+          "name": "allBookings",
+          "header_only_template": false,
+          "body_sha256": "665b0be5c7a760411d6c6827323e59db6c8f669779e90bc5b72d3a9281f48769"
+        },
+        {
+          "name": "showNotifications",
+          "header_only_template": false,
+          "body_sha256": "41b7e33f9b95b6dc1ca427c996da15eb0d723ce9aa1e8660b42df248057c400d"
+        },
+        {
+          "name": "pickPriority",
+          "header_only_template": false,
+          "body_sha256": "648be97929b1feeadb2fc7f2404bcdc494ee9f7cf2621a7ca3ddbbf543210a0f"
+        },
+        {
+          "name": "nearby",
+          "header_only_template": false,
+          "body_sha256": "577e87b5c7b2ac5a952d9a47b81f1ad4d9baa1de771aefdb6b710576fd3a3116"
+        },
+        {
+          "name": "requestRide",
+          "header_only_template": false,
+          "body_sha256": "c9e811d3a86770fc0fd741a031144dd4e323b4d6d16501fb3faed70db61ffe79"
+        },
+        {
+          "name": "bookTrip",
+          "header_only_template": false,
+          "body_sha256": "0c62973029d6e5e839f917b6ad04d531e698c8a4140c29d44e337157388e6751"
+        },
+        {
+          "name": "cancelBooking",
+          "header_only_template": false,
+          "body_sha256": "fd31e0b77f1d9fc6cd8510fdf145533252c6c7a4631c5a8398712319d86cfc3d"
+        },
+        {
+          "name": "myBookingsOrAll",
+          "header_only_template": false,
+          "body_sha256": "b834f57965bb10eeb61aa32b51319850091141f8acbff4109aa2aa7b96809a53"
+        },
+        {
+          "name": "updateStatus",
+          "header_only_template": false,
+          "body_sha256": "9a2be2b68de2b4d58c9bba62324c9eceaa13f69b72592ab8be0d3382879ca70c"
+        },
+        {
+          "name": "deleteBooking",
+          "header_only_template": false,
+          "body_sha256": "c5e27a41d1a46ee1cd3c406724e1ee117bd6e2e479a68a22ec1fedd9ab9179cc"
+        },
+        {
+          "name": "batch",
+          "header_only_template": false,
+          "body_sha256": "4f05d0e6135ee55d1ccdd16e6f4acb34f3d72864c33ac4497109b46fb68de766"
+        },
+        {
+          "name": "createPending",
+          "header_only_template": false,
+          "body_sha256": "c3fe2d22352166bb11774c0ce3852bde4feaa1914334e9ad908020fddaef52e7"
+        },
+        {
+          "name": "manage",
+          "header_only_template": false,
+          "body_sha256": "10fc6b921e6972388b383d16a4ad64c9bcdf294f8cb5212a5d5561231ab723e8"
+        },
+        {
+          "name": "login",
+          "header_only_template": false,
+          "body_sha256": "7a9e9ab573e760b96776efb60af498c36f2910ea90f7dc6278da8eb1c0f1efba"
+        },
+        {
+          "name": "signup",
+          "header_only_template": false,
+          "body_sha256": "ec3021c7ac7c477560df9172d763eca29f1d2bada2cd041babb99d985a9c60b1"
+        },
+        {
+          "name": "userMenu",
+          "header_only_template": false,
+          "body_sha256": "c891ab351b9969c649e01e4ca832f4cf35533e2b6e85e42f3108b5209f1428a3"
+        },
+        {
+          "name": "App",
+          "header_only_template": false,
+          "body_sha256": "bcadf672cbddf5bc33520f3afddaaefc6a0a2586b3a39082e93230e036586f10"
+        },
+        {
+          "name": "run",
+          "header_only_template": false,
+          "body_sha256": "a1e91ebfbc5f41e0dc514a97d61a56db8fd34409e7aacf63348012f229575a0d"
+        }
+      ]
+    }
+  },
+  "sections": {}
+}
