@@ -19,16 +19,16 @@ export const EntityFormModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-pine-900/60 backdrop-blur-xs select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-pine-900/60 backdrop-blur-sm">
       <div
-        className="w-full max-w-lg bg-paper-raised border border-line-grey rounded shadow-none text-left overflow-hidden"
+        className="surface modal-surface w-full max-w-lg text-left shadow-xl"
         role="dialog"
-        aria-modal="true"
+        aria-modal="true" aria-labelledby="entity-form-title"
       >
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-line-grey flex items-center justify-between">
           <div>
-            <h3 className="font-display font-bold text-2xl tracking-condensed text-pine-900 leading-tight">
+            <h3 id="entity-form-title" className="font-display font-bold text-2xl tracking-condensed text-pine-900 leading-tight">
               {title}
             </h3>
             {subtitle && <p className="text-xs text-ink-muted mt-0.5">{subtitle}</p>}
@@ -44,7 +44,7 @@ export const EntityFormModal = ({
 
         {/* Modal Form */}
         <form onSubmit={onSubmit}>
-          <div className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          <div className="p-4 sm:p-6 space-y-4">
             {error && (
               <div className="text-xs text-rust-alert font-medium p-2.5 bg-paper rounded border border-rust-alert/30">
                 {error}
