@@ -110,6 +110,8 @@ CREATE TABLE TRIP (
     -- A physical bus and a driver can each serve only one route per date/slot.
     CONSTRAINT unique_vehicle_slot UNIQUE (vehicle_id, trip_date, slot_id),
     CONSTRAINT unique_driver_slot UNIQUE (driver_id, trip_date, slot_id),
+    UNIQUE KEY unique_vehicle_departure (vehicle_id, departure_time),
+    UNIQUE KEY unique_driver_departure (driver_id, departure_time),
     CONSTRAINT fk_trip_slot FOREIGN KEY (slot_id) REFERENCES DEPARTURE_SLOT(slot_id),
     seats_filled INT DEFAULT 0,
     status ENUM('scheduled', 'departed', 'completed') DEFAULT 'scheduled',
@@ -136,16 +138,28 @@ CREATE TABLE TRIP (
 CREATE TABLE BOOKING (
     booking_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    trip_id INT NOT NULL,
+    trip_id INT NULL,
+    requested_trip_date DATE NULL,
     destination_station_id INT NULL,
     requested_time DATETIME NULL,
     slot_id INT NULL,
     CONSTRAINT fk_booking_destination FOREIGN KEY (destination_station_id) REFERENCES STATION(station_id),
     CONSTRAINT fk_booking_slot FOREIGN KEY (slot_id) REFERENCES DEPARTURE_SLOT(slot_id),
     priority ENUM('normal', 'urgent') DEFAULT 'normal',
-    status ENUM('confirmed', 'pending', 'rejected', 'cancelled') DEFAULT 'pending',
+    status ENUM('confirmed', 'pending', 'rejected', 'cancelled', 'awaiting_choice') DEFAULT 'pending',
     booking_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_user_trip UNIQUE (user_id, trip_id),
+    expires_at DATETIME NULL,
+    original_review_at DATETIME NULL,
+    -- A phone is saved only when the rider opts into WhatsApp for this request.
+    whatsapp_recipient VARCHAR(20) NULL,
+    original_offer_trip_id INT NULL,
+    CONSTRAINT fk_original_offer_trip FOREIGN KEY (original_offer_trip_id) REFERENCES TRIP(trip_id) ON DELETE SET NULL,
+    -- A cancelled or rejected request remains in history without blocking a new attempt.
+    active_trip_id INT GENERATED ALWAYS AS
+        (CASE WHEN status IN ('confirmed','pending','awaiting_choice') THEN trip_id ELSE NULL END) VIRTUAL,
+    INDEX booking_user (user_id),
+    INDEX booking_expiry (status, expires_at),
+    CONSTRAINT unique_user_trip UNIQUE (user_id, active_trip_id),
     CONSTRAINT fk_booking_user FOREIGN KEY (user_id) 
         REFERENCES USER(user_id) 
         ON DELETE CASCADE 
@@ -173,6 +187,7 @@ CREATE TABLE NOTIFICATION_LOG (
     CONSTRAINT fk_notification_booking FOREIGN KEY (booking_id) REFERENCES BOOKING(booking_id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX notification_outbox (channel,status,notification_id),
     CONSTRAINT fk_notification_user FOREIGN KEY (user_id) 
         REFERENCES USER(user_id) 
         ON DELETE CASCADE 
@@ -240,124 +255,93 @@ END$$
 
 -- ----------------------------------------------------------------------------
 -- TRIGGER 1: before_booking_insert
---
--- WHY THIS TRIGGER EXISTS (Viva / Academic Explanation):
--- In an OS and DBMS context, concurrent client threads might issue seat booking
--- requests at the exact same millisecond. If concurrency control were handled
--- purely in application memory, race conditions (time-of-check to time-of-use / TOCTOU)
--- could allow overbooking beyond physical vehicle capacity.
---
--- By placing this check in a database-level BEFORE INSERT trigger running inside
--- the transactional engine (InnoDB):
--- 1. It inspects the actual vehicle capacity joined from VEHICLE against TRIP.seats_filled.
--- 2. If the vehicle is already at capacity (seats_filled >= capacity), it raises
---    a standard SQL custom exception (SQLSTATE '45000').
--- 3. The transaction aborts atomically without polluting the database with illegal rows.
--- ----------------------------------------------------------------------------
+-- Awaiting choice is demand only, including when there are no vacant seats.
+-- Confirmed inserts take a seat. Legacy pending inserts retain their existing guard.
 CREATE TRIGGER before_booking_insert
 BEFORE INSERT ON BOOKING
 FOR EACH ROW
 BEGIN
     DECLARE current_seats INT DEFAULT 0;
     DECLARE max_capacity INT DEFAULT 0;
+    DECLARE locked_vehicle INT;
     DECLARE vehicle_status VARCHAR(20);
 
-    -- Look up the current occupancy and total vehicle capacity for this trip
-    SELECT t.seats_filled, v.capacity, v.status
-    INTO current_seats, max_capacity, vehicle_status
-    FROM TRIP t
-    INNER JOIN VEHICLE v ON t.vehicle_id = v.vehicle_id
-    WHERE t.trip_id = NEW.trip_id FOR UPDATE;
-
-    IF NEW.status IN ('confirmed','pending') AND (vehicle_status IS NULL OR vehicle_status != 'active') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This bus is in maintenance or inactive';
+    IF NOT (NEW.status <=> 'awaiting_choice') THEN
+        SET NEW.expires_at = NULL;
     END IF;
 
-    -- Prevent insert if already full (unless inserting as rejected/cancelled)
-    IF NEW.status != 'rejected' AND NEW.status != 'cancelled' AND current_seats >= max_capacity THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Trip is fully booked — conflict detected';
+    IF NEW.status IN ('confirmed','pending') THEN
+        -- Acquire the trip first, then the vehicle. Consistent ordering avoids lock cycles.
+        SELECT seats_filled, vehicle_id INTO current_seats, locked_vehicle
+        FROM TRIP WHERE trip_id = NEW.trip_id FOR UPDATE;
+        SELECT capacity, status INTO max_capacity, vehicle_status
+        FROM VEHICLE WHERE vehicle_id = locked_vehicle FOR UPDATE;
+
+        IF vehicle_status IS NULL OR vehicle_status <> 'active' THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This bus is in maintenance or inactive';
+        END IF;
+        IF current_seats >= max_capacity THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Trip is fully booked. Choose another option.';
+        END IF;
     END IF;
 END$$
 
--- ----------------------------------------------------------------------------
 -- TRIGGER 2: before_booking_update
---
--- WHY THIS TRIGGER EXISTS (Viva / Academic Explanation):
--- If a booking is updated from 'pending' to 'confirmed' (e.g. after batch scheduling),
--- we must verify that another booking didn't snatch the last remaining seat in the interim.
--- This ensures state transition safety on existing records.
--- ----------------------------------------------------------------------------
+-- A transition into confirmed (or a confirmed move) must pass the target capacity
+-- check, including awaiting_choice -> confirmed. Cancelling an unseated request needs no seat lock.
 CREATE TRIGGER before_booking_update
 BEFORE UPDATE ON BOOKING
 FOR EACH ROW
 BEGIN
     DECLARE current_seats INT DEFAULT 0;
     DECLARE max_capacity INT DEFAULT 0;
+    DECLARE locked_vehicle INT;
     DECLARE vehicle_status VARCHAR(20);
 
-    IF OLD.status != 'confirmed' AND NEW.status = 'confirmed' THEN
-        SELECT t.seats_filled, v.capacity, v.status
-        INTO current_seats, max_capacity, vehicle_status
-        FROM TRIP t
-        INNER JOIN VEHICLE v ON t.vehicle_id = v.vehicle_id
-        WHERE t.trip_id = NEW.trip_id FOR UPDATE;
+    IF NOT (NEW.status <=> 'awaiting_choice') THEN
+        SET NEW.expires_at = NULL;
+    END IF;
 
-        IF vehicle_status IS NULL OR vehicle_status != 'active' THEN
+    IF NEW.status = 'confirmed' AND (NOT (OLD.status <=> 'confirmed') OR OLD.trip_id <> NEW.trip_id) THEN
+        SELECT seats_filled, vehicle_id INTO current_seats, locked_vehicle
+        FROM TRIP WHERE trip_id = NEW.trip_id FOR UPDATE;
+        SELECT capacity, status INTO max_capacity, vehicle_status
+        FROM VEHICLE WHERE vehicle_id = locked_vehicle FOR UPDATE;
+
+        IF vehicle_status IS NULL OR vehicle_status <> 'active' THEN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This bus is in maintenance or inactive';
         END IF;
-
         IF current_seats >= max_capacity THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Trip is fully booked — conflict detected';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Trip is fully booked. Choose another option.';
         END IF;
     END IF;
 END$$
 
--- ----------------------------------------------------------------------------
 -- TRIGGER 3: after_booking_insert
---
--- WHY THIS TRIGGER EXISTS (Viva / Academic Explanation):
--- Implements automated denormalization maintenance. Rather than forcing application
--- developers to execute two coupled queries (INSERT booking + UPDATE trip counter),
--- this trigger guarantees that whenever a booking is created with 'confirmed' status,
--- the trip's seats_filled counter is incremented synchronously and atomically.
--- ----------------------------------------------------------------------------
+-- Confirmed inserts increment occupancy. Awaiting-choice inserts leave it unchanged.
 CREATE TRIGGER after_booking_insert
 AFTER INSERT ON BOOKING
 FOR EACH ROW
 BEGIN
     IF NEW.status = 'confirmed' THEN
-        UPDATE TRIP
-        SET seats_filled = seats_filled + 1
-        WHERE trip_id = NEW.trip_id;
+        UPDATE TRIP SET seats_filled = seats_filled + 1 WHERE trip_id = NEW.trip_id;
     END IF;
 END$$
 
--- ----------------------------------------------------------------------------
 -- TRIGGER 4: after_booking_update
---
--- WHY THIS TRIGGER EXISTS (Viva / Academic Explanation):
--- Manages resource release and allocation on booking status transitions:
--- 1. When a user cancels their seat or an admin rejects a previously confirmed booking,
---    it decrements seats_filled by 1 (bounded at 0), instantly making the seat
---    available for waiting-list / urgent commuters.
--- 2. When a pending request is upgraded to 'confirmed', it increments seats_filled by 1.
--- ----------------------------------------------------------------------------
+-- Confirmed -> cancelled/rejected releases the old trip's seat.
+-- Awaiting choice -> confirmed claims the target trip's seat.
+-- Awaiting choice -> cancelled touches neither counter.
+-- A confirmed move releases the old seat and claims the new seat in the same statement.
 CREATE TRIGGER after_booking_update
 AFTER UPDATE ON BOOKING
 FOR EACH ROW
 BEGIN
-    -- Scenario A: Seat released (confirmed -> cancelled/rejected)
-    IF OLD.status = 'confirmed' AND NEW.status != 'confirmed' THEN
-        UPDATE TRIP
-        SET seats_filled = GREATEST(0, seats_filled - 1)
-        WHERE trip_id = NEW.trip_id;
-    -- Scenario B: Seat claimed (pending/other -> confirmed)
-    ELSEIF OLD.status != 'confirmed' AND NEW.status = 'confirmed' THEN
-        UPDATE TRIP
-        SET seats_filled = seats_filled + 1
-        WHERE trip_id = NEW.trip_id;
+    IF OLD.status = 'confirmed' AND (NOT (NEW.status <=> 'confirmed') OR OLD.trip_id <> NEW.trip_id) THEN
+        UPDATE TRIP SET seats_filled = GREATEST(0, seats_filled - 1) WHERE trip_id = OLD.trip_id;
+    END IF;
+    IF NEW.status = 'confirmed' AND (NOT (OLD.status <=> 'confirmed') OR OLD.trip_id <> NEW.trip_id) THEN
+        UPDATE TRIP SET seats_filled = seats_filled + 1 WHERE trip_id = NEW.trip_id;
     END IF;
 END$$
 
