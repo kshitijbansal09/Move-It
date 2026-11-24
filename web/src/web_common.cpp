@@ -26,14 +26,21 @@ int integer(const Json& object, const std::string& key, int fallback) {
     catch (const Error&) { throw; } catch (...) { throw Error(400,"Choose a valid number for " + key + "."); }
 }
 static std::string env(const char* key, const std::string& fallback = "") { const char* value = std::getenv(key); return value ? value : fallback; }
+bool validWhatsappNumber(const std::string& number) {
+    static const std::regex e164(R"(^\+[1-9][0-9]{7,14}$)");
+    return std::regex_match(number,e164);
+}
 Config Config::load() {
-    std::ifstream file(".env"); std::string line;
+    std::ifstream file(env("MOVEIT_ENV_FILE",".env")); std::string line;
     while (std::getline(file,line)) {
         auto start=line.find_first_not_of(" \t\r");
         if (start == std::string::npos || line[start]=='#') continue;
         auto equals=line.find('=',start); if (equals==std::string::npos) continue;
         auto key=line.substr(start,equals-start); auto end=key.find_last_not_of(" \t"); key.resize(end+1);
-        auto value=line.substr(equals+1); if (!value.empty() && value.back()=='\r') value.pop_back();
+        auto value=line.substr(equals+1);
+        const auto first=value.find_first_not_of(" \t\r");
+        const auto last=value.find_last_not_of(" \t\r");
+        value=first==std::string::npos?"":value.substr(first,last-first+1);
         if (value.size()>=2 && ((value.front()=='"' && value.back()=='"') || (value.front()=='\'' && value.back()=='\''))) value=value.substr(1,value.size()-2);
         if (!std::getenv(key.c_str())) setenv(key.c_str(),value.c_str(),0);
     }
@@ -45,8 +52,25 @@ Config Config::load() {
     if (c.jwtSecret.size()<32) throw Error(500,"JWT_SECRET must contain at least 32 characters.");
     if (!std::regex_match(c.dbName,std::regex("[A-Za-z0-9_]+"))) throw Error(500,"DB_NAME may contain only letters, digits and underscores.");
     c.staticDir=env("STATIC_DIR",c.staticDir); c.schemaFile=env("SCHEMA_FILE",c.schemaFile);
-    c.lowDemandThreshold=std::stoi(env("LOW_DEMAND_THRESHOLD","5"));
-    if (!c.port || c.port>65535 || !c.dbPort || c.dbPort>65535 || c.lowDemandThreshold<1) throw Error(500,"Invalid port or demand threshold configuration.");
+    c.highDemandThreshold=std::stoi(env("HIGH_DEMAND_THRESHOLD",env("LOW_DEMAND_THRESHOLD",std::to_string(c.highDemandThreshold))));
+    c.twilioAccountSid=env("TWILIO_ACCOUNT_SID");
+    c.twilioAuthToken=env("TWILIO_AUTH_TOKEN");
+    c.twilioWhatsappFrom=env("TWILIO_WHATSAPP_FROM");
+    c.twilioWhatsappContentSid=env("TWILIO_WHATSAPP_CONTENT_SID");
+    c.twilioWhatsappRideContentSid=env("TWILIO_WHATSAPP_RIDE_CONTENT_SID");
+    static const std::regex contentSid("HX[0-9a-fA-F]{32}");
+    if (!c.twilioWhatsappContentSid.empty() && !std::regex_match(c.twilioWhatsappContentSid,contentSid))
+        throw Error(500,"TWILIO_WHATSAPP_CONTENT_SID must be an HX content template SID.");
+    if (!c.twilioWhatsappRideContentSid.empty() && !std::regex_match(c.twilioWhatsappRideContentSid,contentSid))
+        throw Error(500,"TWILIO_WHATSAPP_RIDE_CONTENT_SID must be an HX content template SID.");
+    if (!c.twilioWhatsappFrom.empty() && c.twilioWhatsappFrom.front()=='+') c.twilioWhatsappFrom="whatsapp:"+c.twilioWhatsappFrom;
+    static const std::regex accountSid("AC[0-9a-fA-F]{32}");
+    c.whatsappEnabled=env("WHATSAPP_ENABLED","1")=="1" && std::regex_match(c.twilioAccountSid,accountSid) &&
+        !c.twilioAuthToken.empty() && c.twilioWhatsappFrom.rfind("whatsapp:",0)==0 &&
+        validWhatsappNumber(c.twilioWhatsappFrom.substr(9));
+    c.whatsappSimulate=env("WHATSAPP_SIMULATE","0")=="1";
+    c.awaitingChoiceTtlMinutes=std::stoi(env("AWAITING_CHOICE_TTL_MINUTES",std::to_string(c.awaitingChoiceTtlMinutes)));
+    if (!c.port || c.port>65535 || !c.dbPort || c.dbPort>65535 || c.highDemandThreshold<1 || c.awaitingChoiceTtlMinutes<1) throw Error(500,"Invalid port or demand threshold configuration.");
     return c;
 }
 static std::string formatUtc(std::time_t time, const char* pattern) {

@@ -18,7 +18,21 @@ class Service {
     Json booking(int id);
     void ownBooking(const Json& booking);
     void notice(int userId,int bookingId,const std::string& type,const std::string& message);
-    void confirmedNotice(int bookingId);
+    void confirmedNotice(int bookingId, int bookedRiders = 0);
+    Json lockTrip(int tripId);
+    Json lockRideTrip(int destination, const Json& date, const Json& slot, bool allowMissing = false);
+    Json nearbyStations(int stationId, double radius);
+    Json rideOptions(const Json& booking);
+    int rideDemand(int destination, const Json& date, const Json& slot, int excluding = 0, bool confirmedOnly = false);
+    void ensureNoActiveRide(int destination, const Json& date, const Json& slot, int excluding = 0);
+    void expireChoices(const Json& userId);
+    bool expireChoice(const Json& lockedBooking);
+    Json availableOriginalTrip(const Json& booking, int tripId = 0);
+    Result originalRequestStatus(const Json& booking);
+    Result keepOriginalRide(int destination, const std::string& requested, const std::string& priority, int bookingId = 0, const Json& whatsappRecipient = nullptr);
+    Result confirmOriginalRide(int id, const Json& booking);
+    Result requestRide(const Json& body);
+    Result resolveRide(int id, const Json& body);
     Json insertBooking(int userId,int tripId,const std::string& priority,const Json& metadata = Json::object());
     Json slotSummary(const std::string& date);
     Json fleet(const std::string& date);
@@ -30,6 +44,7 @@ class Service {
     Result adminView(const std::string& path,const Json& query);
 public:
     Service(Sql& connection,const Config& settings) : sql(connection),config(settings) {}
+    void reviewPendingRequests();
     Result handle(const std::string& method,const std::string& path,const Json& query,const Json& body,const std::string& authorization);
 };
 int runWeb(int argc,char** argv);

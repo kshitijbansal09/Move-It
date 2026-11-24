@@ -5,6 +5,8 @@ export const bookingsApi = {
     const res = await api.post('/bookings/request', data);
     return res.data;
   },
+  getOptions: async (id) => (await api.get(`/bookings/${id}/options`)).data,
+  resolve: async (id, choice) => (await api.post(`/bookings/${id}/resolve`, choice)).data,
   createBooking: async (data) => {
     const res = await api.post('/bookings', data);
     return res.data;

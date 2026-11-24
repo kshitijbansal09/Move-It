@@ -1,6 +1,9 @@
 #include "web_service.hpp"
+#include "whatsapp.hpp"
 #include "httplib.h"
+#include <chrono>
 #include <filesystem>
+#include <future>
 #include <iostream>
 namespace web {
 int runWeb(int argc,char** argv) {
@@ -41,7 +44,41 @@ int runWeb(int argc,char** argv) {
         });
         server.set_error_handler([](const auto&,auto& response){if(response.status==404)response.set_content(Json{{"success",false},{"message","Page or API endpoint not found."}}.dump(),"application/json");});
         std::cout<<"Move It C++ + MySQL: http://"<<config.host<<":"<<config.port<<"\nDatabase: "<<config.dbName<<"\n"<<std::flush;
-        if(!server.listen(config.host,static_cast<int>(config.port)))throw Error(500,"Unable to listen on the configured address and port.");
+        if(!server.bind_to_port(config.host,static_cast<int>(config.port)))throw Error(500,"Unable to listen on the configured address and port.");
+        std::promise<void> stopWorkers;
+        const auto stop=stopWorkers.get_future().share();
+        auto reviews=std::async(std::launch::async,[&config,stop] {
+            do {
+                try {
+                    Sql sql(config);
+                    Service(sql,config).reviewPendingRequests();
+                } catch (const std::exception& error) {
+                    std::cerr<<"[Original ride review] "<<error.what()<<'\n';
+                }
+            } while (stop.wait_for(std::chrono::seconds(5))==std::future_status::timeout);
+        });
+        std::future<void> whatsapp;
+        bool served;
+        try {
+            if (config.whatsappEnabled) {
+                whatsapp=std::async(std::launch::async,[&config,stop] {
+                    do {
+                        try {
+                            Sql sql(config);
+                            deliverNextWhatsapp(sql,config);
+                        } catch (const std::exception& error) {
+                            std::cerr<<"[WhatsApp] Could not process a queued notification. "<<error.what()<<'\n';
+                        }
+                    } while (stop.wait_for(std::chrono::seconds(3))==std::future_status::timeout);
+                });
+            }
+            served=server.listen_after_bind();
+        } catch (...) {
+            stopWorkers.set_value();
+            throw;
+        }
+        stopWorkers.set_value();
+        if(!served)throw Error(500,"Unable to listen on the configured address and port.");
         return 0;
     }catch(const std::exception& error){std::cerr<<"Move It web startup: "<<error.what()<<'\n';return 1;}
 }

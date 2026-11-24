@@ -17,10 +17,14 @@ struct Error : std::runtime_error {
 struct Config {
     std::string host = "127.0.0.1", dbHost = "localhost", dbUser = "root", dbPassword, dbName = "moveit_cpp", dbSocket;
     std::string jwtSecret, staticDir = "frontend/dist", schemaFile = "sql/schema.sql";
+    std::string twilioAccountSid, twilioAuthToken, twilioWhatsappFrom, twilioWhatsappContentSid;
+    std::string twilioWhatsappRideContentSid;
+    bool whatsappEnabled = false, whatsappSimulate = false;
     unsigned port = 5002, dbPort = 3306;
-    int lowDemandThreshold = 5;
+    int highDemandThreshold = 5, awaitingChoiceTtlMinutes = 30;
     static Config load();
 };
+bool validWhatsappNumber(const std::string& number);
 std::string text(const Json& value);
 std::string field(const Json& object, const std::string& key, const std::string& fallback = "");
 int integer(const Json& object, const std::string& key, int fallback = 0);

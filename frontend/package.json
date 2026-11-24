@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "npm run test:ui",
     "test:ui": "node scripts/checkPhase2Ui.mjs"
   },
   "dependencies": {

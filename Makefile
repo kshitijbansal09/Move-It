@@ -34,8 +34,8 @@ MYSQL_CONFIG ?= mysql_config
 MYSQL_INCLUDE := $(shell $(MYSQL_CONFIG) --include 2>/dev/null)
 MYSQL_LIBDIR := $(shell $(MYSQL_CONFIG) --variable=pkglibdir 2>/dev/null)
 OPENSSL_PREFIX ?= $(firstword $(wildcard /opt/homebrew/opt/openssl@4 /opt/homebrew/opt/openssl@3 /usr/local/opt/openssl@3))
-WEB_CPPFLAGS := -DMOVEIT_WEB -Iinclude -Iweb/include -Iweb/vendor $(MYSQL_INCLUDE) $(if $(OPENSSL_PREFIX),-I$(OPENSSL_PREFIX)/include)
-WEB_LDLIBS := $(if $(MYSQL_LIBDIR),-L$(MYSQL_LIBDIR)) -lmysqlclient $(if $(OPENSSL_PREFIX),-L$(OPENSSL_PREFIX)/lib) -lcrypto -pthread
+WEB_CPPFLAGS := -DMOVEIT_WEB -DCPPHTTPLIB_OPENSSL_SUPPORT -Iinclude -Iweb/include -Iweb/vendor $(MYSQL_INCLUDE) $(if $(OPENSSL_PREFIX),-I$(OPENSSL_PREFIX)/include)
+WEB_LDLIBS := $(if $(MYSQL_LIBDIR),-L$(MYSQL_LIBDIR)) -lmysqlclient $(if $(OPENSSL_PREFIX),-L$(OPENSSL_PREFIX)/lib) -lssl -lcrypto -pthread
 WEB_SOURCES := moveit.cpp $(wildcard src/*.cpp) $(wildcard web/src/*.cpp)
 WEB_OBJECTS := $(patsubst %.cpp,build/web/%.o,$(WEB_SOURCES))
 
