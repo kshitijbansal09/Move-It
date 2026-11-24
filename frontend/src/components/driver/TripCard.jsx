@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '../common/Button';
 import { StatusDot } from '../common/StatusDot';
-import { Bus, Users, Play, CheckCircle } from 'lucide-react';
+import { Play, CheckCircle } from 'lucide-react';
 
 /**
  * Driver Trip Card:
@@ -19,6 +19,7 @@ export const TripCard = ({ trip, onUpdateStatus, isUpdating = false }) => {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
+        timeZone: 'Asia/Kolkata',
       })
     : '--:--';
 
@@ -26,6 +27,7 @@ export const TripCard = ({ trip, onUpdateStatus, isUpdating = false }) => {
     ? new Date(trip.departure_time).toLocaleDateString('en-IN', {
         day: 'numeric',
         month: 'short',
+        timeZone: 'Asia/Kolkata',
       })
     : '';
 
@@ -34,21 +36,21 @@ export const TripCard = ({ trip, onUpdateStatus, isUpdating = false }) => {
     : 0;
 
   return (
-    <div className="bg-paper-raised border border-line-grey p-5 sm:p-6 rounded text-left transition-colors">
+    <div className="surface p-5 sm:p-6 text-left">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line-grey pb-4">
         <div>
           <div className="text-[11px] font-medium text-ink-muted uppercase tracking-wider">
             Assigned Run • Trip #{trip.trip_id}
           </div>
           <h2 className="font-display font-bold text-2xl sm:text-3xl tracking-condensed text-pine-900 mt-0.5">
-            {trip.route_name || `${trip.start_station_name} to ${trip.end_station_name}`}
+            {trip.route_name?.replace('<->', '↔') || `${trip.start_station_name} to ${trip.end_station_name}`}
           </h2>
           <div className="text-xs text-ink-muted mt-0.5">
             Corridor: {trip.start_station_name} → {trip.end_station_name}
           </div>
         </div>
 
-        <div className="text-left sm:text-right">
+        <div className="shrink-0 whitespace-nowrap text-left sm:text-right">
           <div className="text-xs text-ink-muted">Departure</div>
           <div className="font-display font-bold text-2xl tracking-condensed text-pine-900">
             {departureTime}
@@ -83,7 +85,7 @@ export const TripCard = ({ trip, onUpdateStatus, isUpdating = false }) => {
       </div>
 
       {/* Driver Actions */}
-      <div className="border-t border-line-grey pt-4 flex items-center justify-between gap-3">
+      <div className="border-t border-line-grey pt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-ink-muted">
           {isScheduled && 'Run is waiting at origin terminal for boarding'}
           {isDeparted && 'Bus is currently en route along the transit corridor'}

@@ -52,8 +52,8 @@ export const Login = () => {
 
   return (
     <AuthLayout
-      title="Sign in to transit dispatch"
-      subtitle="Enter your institutional credentials to manage corridor bookings"
+      title="Welcome back"
+      subtitle="Sign in with your institutional account."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
@@ -108,30 +108,30 @@ export const Login = () => {
         </div>
 
         {/* Viva / Quick Demo Seed Accounts */}
-        <div className="pt-3 border-t border-line-grey/60 text-left">
+        <div className="auth-demo text-left">
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-ink-muted mb-2">
             <ShieldCheck className="w-3.5 h-3.5 text-pine-900" />
-            <span>Demonstration accounts (Password: Password@123)</span>
+            <span>Fill in a demo account</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() => handleQuickFill('admin@geu.ac.in')}
-              className="text-[11px] px-2 py-0.5 bg-paper hover:bg-line-grey/40 text-pine-900 rounded border border-line-grey transition-colors"
+              className="text-xs px-2.5 py-1.5 bg-paper-raised hover:bg-line-grey/40 text-pine-900 rounded border border-line-grey transition-colors"
             >
               Admin (Dr. Sharma)
             </button>
             <button
               type="button"
               onClick={() => handleQuickFill('sunita.verma@geu.ac.in')}
-              className="text-[11px] px-2 py-0.5 bg-paper hover:bg-line-grey/40 text-pine-900 rounded border border-line-grey transition-colors"
+              className="text-xs px-2.5 py-1.5 bg-paper-raised hover:bg-line-grey/40 text-pine-900 rounded border border-line-grey transition-colors"
             >
               Faculty (Prof. Verma)
             </button>
             <button
               type="button"
               onClick={() => handleQuickFill('rahul.student@geu.ac.in')}
-              className="text-[11px] px-2 py-0.5 bg-paper hover:bg-line-grey/40 text-pine-900 rounded border border-line-grey transition-colors"
+              className="text-xs px-2.5 py-1.5 bg-paper-raised hover:bg-line-grey/40 text-pine-900 rounded border border-line-grey transition-colors"
             >
               Student (Rahul)
             </button>

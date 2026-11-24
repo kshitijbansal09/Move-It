@@ -1,307 +1,125 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '../common/Button';
-import { CheckCircle2, AlertTriangle, ArrowRight, RotateCcw, MapPin, ExternalLink } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { getStationLocation } from '../../utils/stationLocations';
+import { DepartureDetails } from './DepartureDetails';
+import { departureLabel } from '../../utils/departure';
 
-/**
- * Live status panel for ride request progression:
- * 1. "Request received"
- * 2. "Checking availability"
- * 3. Result: "Seat confirmed on [trip]" OR "Low demand — here's a nearby option"
- */
-export const BookingStatusPanel = ({
-  stage, // 'received' | 'evaluating' | 'confirmed' | 'alternative' | 'conflict' | 'error'
-  resultData,
-  errorMessage,
-  onAcceptAlternative,
-  onReset,
-  isAccepting = false,
-}) => {
+const requestCount = count => `${count} ${count === 1 ? 'request' : 'requests'}`;
+
+function OptionRows({ title, options, action = 'choose_slot', selected, onSelect, busy }) {
   return (
-    <div className="border border-line-grey bg-paper-raised p-5 rounded text-left transition-all">
-      {/* Stage Progression Indicator */}
-      <div className="flex items-center gap-6 pb-4 border-b border-line-grey text-xs">
-        {/* Step 1 */}
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              stage === 'received' ? 'bg-marigold live-pulse' : 'bg-success-moss'
-            }`}
-          />
-          <span className={stage === 'received' ? 'font-medium text-pine-900' : 'text-ink-muted'}>
-            Request received
-          </span>
-        </div>
+    <fieldset disabled={busy} className="min-w-0">
+      <legend className="font-display text-xl font-semibold">{title}</legend>
+      {options.length === 0 && <p className="py-2 text-sm text-ink-muted">No departures available.</p>}
+      {options.map(option => {
+        const key = `${action}/${option.destination_station_id ?? ""}/${option.slot_id}`;
+        const available = option.scheduled && option.seats_available > 0;
+        return (
+          <label key={key} className="ride-option mt-1.5 flex items-center gap-3 border border-line-grey rounded px-3 py-2.5 text-sm">
+            <input
+              type="radio"
+              name="ride-choice"
+              className="accent-pine-900"
+              checked={selected === key}
+              disabled={!available}
+              onChange={() => onSelect({ key, action, slot_id: option.slot_id,
+                ...(option.destination_station_id && { destination_station_id: option.destination_station_id }) })}
+            />
+            <span className="font-display text-lg font-semibold min-w-16">{option.slot_label}</span>
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              {option.station && <span>{option.station}{option.distance_km != null && ` (${option.distance_km} km)`}</span>}
+              <span className="text-ink-muted">{requestCount(option.request_count)}</span>
+              <span className="text-ink-muted">{option.scheduled ? `${option.seats_available} seats left` : 'No bus scheduled'}</span>
+              {option.high_demand && <span className="text-success-moss">Enough riders</span>}
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
 
-        <div className="w-8 h-px bg-line-grey" />
-
-        {/* Step 2 */}
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              stage === 'evaluating'
-                ? 'bg-marigold live-pulse'
-                : ['confirmed', 'alternative', 'conflict', 'error'].includes(stage)
-                ? 'bg-success-moss'
-                : 'bg-line-grey'
-            }`}
-          />
-          <span className={stage === 'evaluating' ? 'font-medium text-pine-900' : 'text-ink-muted'}>
-            Checking availability
-          </span>
-        </div>
-
-        <div className="w-8 h-px bg-line-grey" />
-
-        {/* Step 3 */}
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              stage === 'confirmed'
-                ? 'bg-success-moss'
-                : stage === 'alternative'
-                ? 'bg-marigold'
-                : stage === 'conflict' || stage === 'error'
-                ? 'bg-rust-alert'
-                : 'bg-line-grey'
-            }`}
-          />
-          <span
-            className={
-              ['confirmed', 'alternative', 'conflict', 'error'].includes(stage)
-                ? 'font-medium text-pine-900'
-                : 'text-ink-muted'
-            }
-          >
-            {stage === 'confirmed'
-              ? 'Seat confirmed'
-              : stage === 'alternative'
-              ? 'Alternative found'
-              : stage === 'conflict'
-              ? 'Trip full'
-              : stage === 'error'
-              ? 'Notice'
-              : 'Allocation'}
-          </span>
+export function BookingStatusPanel({ result, onResolve, onReset, busy, error }) {
+  const [selected, setSelected] = useState(null);
+  const { booking, message, options } = result;
+  if (result.outcome === 'confirmed' || result.outcome === 'cancelled') {
+    return (
+      <div className="space-y-3">
+        <p role="status" className="text-sm">{message}</p>
+        {result.outcome === 'confirmed' && <DepartureDetails booking={booking} board />}
+        <Button variant="ghost" size="sm" onClick={onReset}>Request another ride</Button>
+      </div>
+    );
+  }
+  if (['waiting_original', 'original_offer', 'original_unavailable'].includes(result.outcome)) {
+    return (
+      <div className="space-y-3">
+        <h3 className="font-display text-xl font-bold">
+          {result.offer ? 'A bus is available' : result.outcome === 'original_unavailable' ? 'The offered bus is unavailable' : 'Original request saved'}
+        </h3>
+        <p className="text-sm">Preferred ride to <strong>{booking.destination}</strong> · {departureLabel(booking.preferred_departure)} India time</p>
+        {result.offer ? (
+          <div className="rounded border border-line-grey bg-paper p-3 text-sm">
+            <strong>{departureLabel(result.offer.departure_time)} India time</strong> · {result.offer.reg_number}
+            <p className="text-ink-muted mt-1">Confirm before this bus departs to reserve a seat.</p>
+          </div>
+        ) : result.outcome === 'waiting_original' ? (
+          <p className="text-sm text-ink-muted">
+            Look for an in-app update around {departureLabel(booking.original_review_at)} India time. Your request counts toward demand.
+          </p>
+        ) : (
+          <p className="text-sm text-ink-muted">This bus may have filled, departed, or been rescheduled.</p>
+        )}
+        {error && <p role="alert" className="text-sm text-rust-alert">{error}</p>}
+        <div className="flex flex-wrap gap-2">
+          {result.offer && <Button disabled={busy} onClick={() => onResolve({ action: 'confirm_original' })}>Confirm this ride</Button>}
+          <Button variant="ghost" size="sm" onClick={onReset}>Back to request form</Button>
         </div>
       </div>
-
-      {/* Dynamic Content Body */}
-      <div className="pt-4">
-        {/* Evaluating State */}
-        {(stage === 'received' || stage === 'evaluating') && (
-          <div className="py-6 flex flex-col items-center justify-center text-center gap-3">
-            <div className="relative flex h-3 w-3">
-              <span className="live-pulse absolute inline-flex h-full w-full rounded-full bg-marigold opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-marigold" />
-            </div>
-            <div>
-              <div className="font-display font-bold text-xl tracking-condensed text-pine-900">
-                {stage === 'received' ? 'Request recorded in dispatch' : 'Evaluating corridor demand...'}
-              </div>
-              <p className="text-xs text-ink-muted mt-1 max-w-sm">
-                Finding your next fixed departure and checking available seats.
-              </p>
-            </div>
-          </div>
+    );
+  }
+  const canConfirm = selected && [...options.slots, ...options.nearby, ...(options.fixed || [])].some(option =>
+    option.destination_station_id === selected.destination_station_id &&
+    option.slot_id === selected.slot_id && option.scheduled && option.seats_available > 0);
+  const confirm = () => {
+    const { key, ...choice } = selected;
+    onResolve(choice);
+  };
+  const deadline = booking.expires_at && new Date(booking.expires_at).toLocaleTimeString('en-IN', {
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
+  });
+  return (
+    <div aria-labelledby="ride-options-title" className="space-y-4">
+      <div>
+        <h3 id="ride-options-title" className="font-display text-2xl font-semibold">
+          {result.low_demand === false ? 'Ride options for' : 'Few riders so far for'} {booking.destination} at {booking.slot_label} ({requestCount(result.demandCount)})
+        </h3>
+        {(result.next_day || result.time_adjusted) && <p className="text-sm">{message}</p>}
+        {result.direct_trip_scheduled === false && (
+          <p className="text-sm mt-1">Your request has been counted. You can keep your original ride request or choose another departure.</p>
         )}
-
-        {/* Confirmed State */}
-        {stage === 'confirmed' && resultData && (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-success-moss shrink-0 mt-0.5" />
-              <div>
-                <div className="font-display font-bold text-2xl tracking-condensed text-pine-900 leading-tight">
-                  Your bus leaves at {resultData.booking?.slot_label || 'the assigned departure'}
-                </div>
-                <p className="text-xs text-ink-muted mt-1">
-                  {resultData.message || 'Your seat is confirmed. Departure details are available below.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Trip details grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-paper p-3 rounded border border-line-grey text-xs">
-              <div>
-                <span className="text-ink-muted block text-[11px]">Route</span>
-                <span className="font-medium text-pine-900">
-                  {resultData.booking?.trip_details?.routeName || 'Campus Corridor'}
-                </span>
-              </div>
-              <div>
-                <span className="text-ink-muted block text-[11px]">Departure time</span>
-                <span className="font-medium text-pine-900">
-                  {resultData.booking?.slot_label || 'Departure unavailable'}
-                </span>
-              </div>
-              <div>
-                <span className="text-ink-muted block text-[11px]">Vehicle reg</span>
-                <span className="font-medium text-pine-900 font-mono">
-                  {resultData.booking?.trip_details?.vehicleReg || 'Transit bus'}
-                </span>
-              </div>
-              <div>
-                <span className="text-ink-muted block text-[11px]">Driver</span>
-                <span className="font-medium text-pine-900">
-                  {resultData.booking?.driver_name || 'Driver unavailable'}<br />{resultData.booking?.driver_contact || ''}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <Link
-                to={`/booking/${resultData.booking?.bookingId || resultData.booking?.booking_id || resultData.bookingId}`}
-              >
-                <Button variant="primary" size="md">
-                  <span>Track route stations</span>
-                  <ArrowRight className="w-4 h-4 ml-1.5" />
-                </Button>
-              </Link>
-              <Button variant="ghost" size="sm" onClick={onReset}>
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                <span>Request another ride</span>
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Low Demand / Alternative Station State */}
-        {stage === 'alternative' && (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-marigold mt-1.5 shrink-0" />
-              <div>
-                <div className="font-display font-bold text-2xl tracking-condensed text-pine-900 leading-tight">
-                  Low demand — here's a nearby option
-                </div>
-                <p className="text-xs text-ink-muted mt-1">
-                  Demand for your selected station is below the minimum threshold (5 commuters).
-                  We found an active scheduled trip from a nearby valley station.
-                </p>
-              </div>
-            </div>
-
-            {/* Alternative Trip Details */}
-            {resultData?.suggestedAlternativeTrip ? (
-              <div className="border border-line-grey bg-paper p-4 rounded text-xs space-y-3">
-                {(() => {
-                  const altLoc = getStationLocation({ name: resultData.suggestedAlternativeTrip.stationName });
-                  return (
-                    <div className="border-b border-line-grey pb-2.5 space-y-1">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-display font-bold text-xl tracking-condensed text-pine-900">
-                            {resultData.suggestedAlternativeTrip.stationName}
-                          </span>
-                          <span className="text-[11px] font-medium text-indigo-500 bg-paper-raised px-2 py-0.5 rounded border border-line-grey">
-                            {altLoc.zone}
-                          </span>
-                        </div>
-                        <div className="text-ink-muted font-medium">
-                          {resultData.suggestedAlternativeTrip.distanceKm} km away from requested stop
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="text-pine-900 font-medium">
-                          Exact location: <span className="text-ink-muted font-normal">{altLoc.landmark}</span>
-                        </div>
-                        <a
-                          href={altLoc.mapUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-marigold-dark hover:text-pine-900 font-medium hover:underline"
-                        >
-                          <MapPin className="w-3.5 h-3.5" />
-                          <span>View on Google Maps</span>
-                          <ExternalLink className="w-3 h-3 ml-0.5" />
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <span className="text-ink-muted block text-[11px]">Departure time</span>
-                    <span className="font-medium text-pine-900 text-sm">
-                      {resultData.suggestedAlternativeTrip.departureTime}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-ink-muted block text-[11px]">Route</span>
-                    <span className="font-medium text-pine-900">
-                      {resultData.suggestedAlternativeTrip.routeName}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-ink-muted block text-[11px]">Seats available</span>
-                    <span className="font-medium text-success-moss">
-                      {resultData.suggestedAlternativeTrip.availableSeats} seats open
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center justify-between gap-3">
-                  <Button
-                    variant="primary"
-                    size="md"
-                    loading={isAccepting}
-                    onClick={() => onAcceptAlternative(resultData.suggestedAlternativeTrip.tripId)}
-                  >
-                    <span>Accept this nearby option</span>
-                    <ArrowRight className="w-4 h-4 ml-1.5" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={onReset}>
-                    <span>Change destination</span>
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="border border-line-grey bg-paper p-4 rounded text-xs">
-                <p className="text-pine-900 font-medium">
-                  {resultData?.message || 'No direct buses are currently scheduled for this route.'}
-                </p>
-                <p className="text-ink-muted mt-1">
-                  Estimated next shuttle service is in ~45 minutes. A WhatsApp notification has been queued for your account.
-                </p>
-                <div className="mt-3">
-                  <Button variant="secondary" size="sm" onClick={onReset}>
-                    <span>Try another destination</span>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Conflict / Error State */}
-        {(stage === 'conflict' || stage === 'error') && (
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-rust-alert shrink-0 mt-0.5" />
-              <div>
-                <div className="font-display font-bold text-xl tracking-condensed text-pine-900">
-                  {stage === 'conflict'
-                    ? 'This trip is fully booked. Try the nearby-station option below.'
-                    : 'Unable to complete transit request'}
-                </div>
-                <p className="text-xs text-ink-muted mt-1">
-                  {errorMessage || 'Vehicle capacity conflict detected by MySQL trigger. No seats remain on this specific departure.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center gap-3">
-              <Button variant="secondary" size="sm" onClick={onReset}>
-                <span>Try another station or time</span>
-              </Button>
-            </div>
-          </div>
-        )}
+        <p className="text-sm text-ink-muted mt-1">
+          Your request stays open for up to {result.choice_ttl_minutes} minutes
+          {deadline ? ` (until ${deadline} India time)` : ''}. Seats are assigned when you confirm.
+        </p>
+      </div>
+      {!(booking.requested_time && Date.parse(booking.requested_time.replace(' ', 'T') + '+05:30') <= Date.now()) && (
+        <div className="rounded border border-line-grey bg-paper p-3 space-y-2">
+          <p className="text-sm">Keep your destination and preferred time. We’ll check for a bus in about {result.choice_ttl_minutes} minutes and notify you here.</p>
+          <Button variant="secondary" disabled={busy} onClick={() => onResolve({ action: 'wait_original' })}>Keep my original request</Button>
+        </div>
+      )}
+      <OptionRows title={`Other times to ${booking.destination}`} options={options.slots}
+        selected={selected?.key} onSelect={setSelected} busy={busy} />
+      <OptionRows title="Nearby destinations" options={options.nearby} action="choose_nearby"
+        selected={selected?.key} onSelect={setSelected} busy={busy} />
+      {options.fixed?.length > 0 && <OptionRows title="Other college departures" options={options.fixed} action="choose_departure"
+        selected={selected?.key} onSelect={setSelected} busy={busy} />}
+      {error && <p role="alert" className="text-sm text-rust-alert">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={!canConfirm || busy} onClick={confirm}>Confirm this option</Button>
+        <Button variant="danger" disabled={busy} onClick={() => onResolve({ action: 'cancel' })}>Cancel my request</Button>
+        <Button variant="ghost" disabled={busy} onClick={onReset}>Close options</Button>
       </div>
     </div>
   );
-};
+}

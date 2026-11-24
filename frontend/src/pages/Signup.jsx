@@ -93,8 +93,8 @@ export const Signup = () => {
 
   return (
     <AuthLayout
-      title="Register for transit pass"
-      subtitle="Commuter profile for Graphic Era campus and Doon Valley transit"
+      title="Create your account"
+      subtitle="Register for Graphic Era campus rides."
     >
       <form onSubmit={handleSubmit} className="space-y-3.5">
         {error && (

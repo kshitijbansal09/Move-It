@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { bookingsApi } from '../api/bookings';
 import { tripsApi } from '../api/trips';
-import { stationsApi } from '../api/stations';
+import { routesApi } from '../api/routes';
 import { NavBar } from '../components/layout/NavBar';
 import { DepartureDetails } from '../components/booking/DepartureDetails';
 import { RouteTracker } from '../components/booking/RouteTracker';
@@ -10,77 +10,42 @@ import { Spinner } from '../components/common/Spinner';
 import { Button } from '../components/common/Button';
 import { ArrowLeft } from 'lucide-react';
 
+const whatsappStatuses = {
+  pending: 'Queued',
+  sending: 'Sending',
+  submitted: 'Submitted to WhatsApp',
+  failed: 'Send failed',
+  unknown: 'Could not verify submission',
+  skipped: 'Skipped because the account phone number changed',
+  simulated: 'Simulated',
+};
+
 export const BookingDetail = () => {
   const { id } = useParams();
-  const [booking, setBooking] = useState(null);
-  const [trip, setTrip] = useState(null);
-  const [stops, setStops] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [details, setDetails] = useState(null);
+  const loading = !details || details.id !== id;
+  const { booking, trip, route, error } = loading ? {} : details;
 
   useEffect(() => {
-    let isMounted = true;
+    let current = true;
     const loadDetails = async () => {
       try {
-        const bookingData = await bookingsApi.getById(id);
-        if (!bookingData) throw new Error(`Booking #${id} does not exist in the transit registry.`);
-        if (isMounted) setBooking(bookingData);
+        const booking = await bookingsApi.getById(id);
+        if (!booking) throw new Error('Booking not found.');
 
-        // Fetch Trip details
-        if (bookingData.trip_id) {
-          const tripData = await tripsApi.getById(bookingData.trip_id).catch(() => null);
-          if (isMounted) setTrip(tripData);
-        }
+        const trip = booking.trip_id ? await tripsApi.getById(booking.trip_id).catch(() => null) : null;
+        if (!current) return;
 
-        // Fetch all stations to interpolate intermediate corridor waypoints
-        const allStations = await stationsApi.getAll();
-        if (isMounted && Array.isArray(allStations)) {
-          // Construct sequential route waypoints starting from origin to destination
-          const startName = bookingData.start_station_name;
-          const endName = bookingData.end_station_name;
-
-          const startStation = allStations.find((s) => s.name === startName) || allStations[0];
-          const endStation = allStations.find((s) => s.name === endName) || allStations[allStations.length - 1];
-
-          // Intermediate stations
-          const intermediates = allStations
-            .filter((s) => s.station_id !== startStation?.station_id && s.station_id !== endStation?.station_id)
-            .slice(0, 2);
-
-          const sequentialStops = [
-            {
-              station_id: startStation?.station_id,
-              name: startStation?.name || 'Graphic Era Campus Hub',
-              time: 'Origin Departure',
-              status: 'passed',
-            },
-            ...intermediates.map((s, idx) => ({
-              station_id: s.station_id,
-              name: s.name,
-              time: `+${(idx + 1) * 15} min`,
-              status: 'intermediate',
-            })),
-            {
-              station_id: endStation?.station_id,
-              name: endStation?.name || 'Corridor Terminus',
-              time: 'Final Drop-off',
-              status: 'destination',
-            },
-          ];
-
-          setStops(sequentialStops);
-        }
+        const route = trip?.route_id ? await routesApi.getById(trip.route_id).catch(() => null) : null;
+        if (current) setDetails({ id, booking, trip, route });
       } catch (err) {
-        console.error('[Move It] Error loading route tracker:', err);
-        if (isMounted) setError(err.message || 'Unable to retrieve corridor route data.');
-      } finally {
-        if (isMounted) setLoading(false);
+        if (current) setDetails({ id, error: err.message || 'Unable to retrieve the booking.' });
       }
     };
 
     loadDetails();
     return () => {
-      isMounted = false;
+      current = false;
     };
   }, [id]);
 
@@ -88,9 +53,9 @@ export const BookingDetail = () => {
     <div className="min-h-screen bg-paper text-pine-900 flex flex-col">
       <NavBar />
 
-      <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <main className="workspace flex-1 space-y-5">
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between border-b border-line-grey pb-3 text-left">
+        <div className="flex flex-wrap gap-2 items-center justify-between text-left">
           <Link to="/dashboard">
             <Button variant="ghost" size="sm" className="text-xs">
               <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
@@ -104,11 +69,11 @@ export const BookingDetail = () => {
 
         {/* Content Body */}
         {loading ? (
-          <div className="py-24 flex justify-center items-center bg-paper-raised border border-line-grey rounded">
-            <Spinner size="md" message="Synchronizing corridor telemetry and route markers..." />
+          <div className="surface py-24 flex justify-center items-center">
+            <Spinner size="md" message="Loading trip details..." />
           </div>
         ) : error ? (
-          <div className="p-8 bg-paper-raised border border-line-grey rounded text-center">
+          <div className="surface p-8 text-center">
             <h2 className="font-display font-bold text-2xl tracking-condensed text-pine-900">
               Trip tracking unavailable
             </h2>
@@ -125,13 +90,16 @@ export const BookingDetail = () => {
           </div>
         ) : (
           <>
-          <DepartureDetails booking={booking} />
-          {trip && <RouteTracker
-            trip={trip}
-            booking={booking}
-            stops={stops}
-            userStationId={booking?.station_id}
-          />}
+            <DepartureDetails booking={booking} />
+            {booking.whatsapp_updates && (
+              <p className="text-sm text-ink-muted">
+                WhatsApp update ? {whatsappStatuses[booking.whatsapp_status] || 'No update queued yet'}
+              </p>
+            )}
+            {trip && <RouteTracker trip={trip} route={route} />}
+            {!trip && booking.trip_id && (
+              <p className="text-sm text-ink-muted">The assigned trip route is temporarily unavailable.</p>
+            )}
           </>
         )}
       </main>

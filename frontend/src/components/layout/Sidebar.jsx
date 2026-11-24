@@ -24,32 +24,23 @@ const NAV_ITEMS = [
 
 export const Sidebar = ({ activeTab, onSelectTab }) => {
   return (
-    <aside className="w-full md:w-56 shrink-0 bg-pine-900 text-paper border-b md:border-b-0 md:border-r border-pine-700">
-      <div className="p-4 md:py-6">
-        <div className="text-xs text-paper/40 font-semibold px-3 mb-2 hidden md:block">
-          Operations
-        </div>
-        <nav className="flex md:flex-col overflow-x-auto md:overflow-visible gap-1 pb-2 md:pb-0">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectTab(item.id)}
-                className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded whitespace-nowrap transition-colors text-left ${
-                  isActive
-                    ? 'bg-pine-700 text-paper border-l-2 md:border-l-4 border-marigold'
-                    : 'text-paper/70 hover:text-paper hover:bg-pine-700/50'
-                }`}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-marigold' : 'text-paper/60'}`} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+    <aside className="admin-sidebar">
+      <nav aria-label="Operations">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onSelectTab(item.id)}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <Icon size={17} className="shrink-0" aria-hidden="true" />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </aside>
   );
 };

@@ -22,12 +22,13 @@ export const StatusDot = ({
           textClass: 'text-success-moss',
           defaultLabel: normalized === 'confirmed' ? 'Confirmed' : normalized === 'completed' ? 'Completed' : 'Active',
         };
+      case 'awaiting_choice':
       case 'pending':
       case 'scheduled':
         return {
           dotBg: 'bg-marigold',
           textClass: 'text-pine-900',
-          defaultLabel: normalized === 'pending' ? 'Pending' : 'Scheduled',
+          defaultLabel: { awaiting_choice: 'Awaiting choice', pending: 'Pending', scheduled: 'Scheduled' }[normalized],
         };
       case 'cancelled':
       case 'rejected':

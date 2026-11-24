@@ -20,11 +20,11 @@ export const Select = ({
   const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
   return (
-    <div className={`flex flex-col gap-1 text-left ${className}`}>
+    <div className={`flex min-w-0 flex-col gap-1.5 text-left ${className}`}>
       {label && (
-        <label htmlFor={selectId} className="text-xs font-medium text-pine-900 flex items-center justify-between">
+        <label htmlFor={selectId} className="text-xs font-semibold text-pine-900 flex flex-wrap items-center justify-between gap-x-1">
           <span>{label}</span>
-          {required && <span className="text-rust-alert font-normal text-[11px]">Required</span>}
+          {required && <span className="text-ink-muted font-normal text-[11px]">Required</span>}
         </label>
       )}
       <div className="relative">
@@ -34,7 +34,7 @@ export const Select = ({
           onChange={onChange}
           disabled={disabled}
           required={required}
-          className={`w-full px-3 py-2 pr-8 text-sm bg-paper-raised text-pine-900 border rounded appearance-none cursor-pointer transition-colors focus:outline-none focus:border-marigold focus:ring-1 focus:ring-marigold disabled:opacity-50 disabled:bg-paper ${
+          className={`w-full min-w-0 min-h-11 px-3 py-2.5 pr-8 text-sm bg-paper text-pine-900 border rounded appearance-none cursor-pointer transition-colors focus:outline-none focus:border-marigold focus:ring-1 focus:ring-marigold disabled:opacity-50 disabled:bg-paper ${
             error ? 'border-rust-alert focus:border-rust-alert' : 'border-line-grey'
           }`}
           {...props}

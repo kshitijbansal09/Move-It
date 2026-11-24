@@ -7,10 +7,12 @@ import { NavBar } from '../components/layout/NavBar';
 import { RequestRideForm } from '../components/booking/RequestRideForm';
 import { BookingRow } from '../components/booking/BookingRow';
 import { Spinner } from '../components/common/Spinner';
-import { RefreshCw, Filter } from 'lucide-react';
+import { RefreshCw, MapPin, Ticket } from 'lucide-react';
 
 export const StudentDashboard = () => {
   const { user } = useAuth();
+  const [choiceRequest, setChoiceRequest] = useState(null);
+  const openChoice = id => setChoiceRequest({ id });
   const [notifications, setNotifications] = useState([]);
   const [notificationError, setNotificationError] = useState(null);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -40,6 +42,13 @@ export const StudentDashboard = () => {
   const refreshDashboard = useCallback(async () => { await Promise.all([fetchBookings(),fetchNotifications()]); }, [fetchBookings,fetchNotifications]);
   useEffect(() => { refreshDashboard(); }, [refreshDashboard]);
 
+  const hasOriginalRequest = bookings.some(booking => booking.status === 'awaiting_choice' && booking.original_review_at);
+  useEffect(() => {
+    if (!hasOriginalRequest) return undefined;
+    const poll = window.setInterval(async () => { await fetchBookings(); await fetchNotifications(); }, 10000);
+    return () => window.clearInterval(poll);
+  }, [hasOriginalRequest, fetchBookings, fetchNotifications]);
+
   const handleCancelBooking = async (bookingId) => {
     setCancellingId(bookingId);
     setActionNotice(null);
@@ -47,7 +56,7 @@ export const StudentDashboard = () => {
       await bookingsApi.cancel(bookingId);
       setActionNotice({
         type: 'success',
-        text: `Booking #${bookingId} has been cancelled. Seat returned to corridor pool.`,
+        text: `Booking #${bookingId} has been cancelled.`,
       });
       await fetchBookings();
     } catch (err) {
@@ -70,18 +79,17 @@ export const StudentDashboard = () => {
     <div className="min-h-screen bg-paper text-pine-900 flex flex-col">
       <NavBar />
 
-      <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+      <main className="workspace flex-1 space-y-7">
         {/* Welcome & Context Header */}
-        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-line-grey pb-4 text-left">
+        <div className="dashboard-hero">
           <div>
-            <h1 className="font-display font-bold text-3xl sm:text-4xl tracking-condensed text-pine-900 leading-tight">
-              Transit dispatch
-            </h1>
-            <p className="text-xs text-ink-muted mt-1">
-              Active commuter: {user?.name} • Station: {user?.station_name || 'Graphic Era Hub'}
+            <h1>Plan your next ride</h1>
+            <p className="hero-context">
+              <MapPin size={16} aria-hidden="true" />
+              {user?.station_name || 'Graphic Era Hub'}
               {user?.role === 'faculty' && (
-                <span className="ml-2 font-medium text-indigo-500">
-                  (Faculty Priority Allocation Active)
+                <span className="ml-2 font-medium text-marigold">
+                  Faculty priority
                 </span>
               )}
             </p>
@@ -93,7 +101,7 @@ export const StudentDashboard = () => {
                 setLoadingBookings(true);
                 refreshDashboard();
               }}
-              className="inline-flex items-center gap-1.5 text-xs text-ink-muted hover:text-pine-900 py-1 px-2.5 rounded border border-line-grey hover:bg-paper-raised transition-colors"
+              className="hero-action"
               title="Refresh departures"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingBookings ? 'animate-spin' : ''}`} />
@@ -102,12 +110,12 @@ export const StudentDashboard = () => {
           </div>
         </div>
 
-        <NotificationsPanel notifications={notifications} loading={notificationsLoading} error={notificationError} onRefresh={refreshDashboard} />
-
-        {/* Top: Ride Request Panel */}
-        <section aria-labelledby="request-ride-title">
-          <RequestRideForm onBookingSuccess={refreshDashboard} />
-        </section>
+        <div className="commuter-grid">
+          <section aria-labelledby="request-ride-title" className="min-w-0">
+            <RequestRideForm onBookingSuccess={refreshDashboard} choiceRequest={choiceRequest} />
+          </section>
+          <NotificationsPanel notifications={notifications} loading={notificationsLoading} error={notificationError} onOpenChoice={openChoice} />
+        </div>
 
         {/* Action Notice (Plain English) */}
         {actionNotice && (
@@ -130,31 +138,28 @@ export const StudentDashboard = () => {
 
         {/* Bottom: "Your Bookings" Departure Board */}
         <section aria-labelledby="bookings-board-title" className="text-left space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line-grey pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 id="bookings-board-title" className="font-display font-bold text-2xl tracking-condensed text-pine-900">
                 Your bookings
               </h2>
-              <p className="text-xs text-ink-muted">
-                Departure board of registered seat reservations and corridor passes
-              </p>
             </div>
 
             {/* Filter by status */}
-            <div className="flex items-center gap-2 text-xs">
-              <Filter className="w-3.5 h-3.5 text-ink-muted" />
-              <div className="inline-flex rounded border border-line-grey bg-paper-raised p-0.5">
-                {['all', 'confirmed', 'pending', 'cancelled'].map((st) => (
+            <div className="text-xs">
+              <div className="booking-filter" aria-label="Filter bookings">
+                {['all', 'confirmed', 'awaiting_choice', 'pending', 'cancelled'].map((st) => (
                   <button
                     key={st}
                     onClick={() => setFilterStatus(st)}
+                    aria-pressed={filterStatus === st}
                     className={`px-2.5 py-1 text-xs capitalize rounded transition-colors ${
                       filterStatus === st
-                        ? 'bg-pine-900 text-paper font-medium'
+                        ? 'bg-paper-raised text-pine-900 shadow-sm'
                         : 'text-ink-muted hover:text-pine-900'
                     }`}
                   >
-                    {st}
+                    {st.replace('_', ' ')}
                   </button>
                 ))}
               </div>
@@ -162,28 +167,22 @@ export const StudentDashboard = () => {
           </div>
 
           {/* Departure-board Style List */}
-          <div className="bg-paper-raised border border-line-grey rounded overflow-hidden">
-            {/* Board Column Headers (Hidden on small mobile) */}
-            <div className="hidden sm:flex items-center justify-between py-2 px-4 bg-paper text-ink-muted font-medium text-xs border-b border-line-grey">
-              <div className="min-w-[240px]">Time & Destination</div>
-              <div className="w-44">Vehicle & Priority</div>
-              <div className="w-28">Status</div>
-              <div className="w-36 text-right">Action</div>
-            </div>
+          <div className="surface booking-board">
 
             {loadingBookings ? (
               <div className="py-12 flex justify-center items-center">
                 <Spinner size="md" message="Loading departure records..." />
               </div>
             ) : filteredBookings.length === 0 ? (
-              <div className="py-12 px-6 text-center text-left">
+              <div className="py-12 px-6 text-center">
+                <Ticket className="mx-auto mb-3 text-ink-muted" size={27} aria-hidden="true" />
                 <p className="text-sm font-medium text-pine-900">
                   {filterStatus === 'all'
                     ? "You haven't booked a ride yet. Request one above to get started."
                     : `No ${filterStatus} bookings found on your schedule.`}
                 </p>
                 <p className="text-xs text-ink-muted mt-1">
-                  Once requested, confirmed trips will appear here with live tracking links.
+                  Confirmed trips will appear here with route details and driving directions.
                 </p>
               </div>
             ) : (
@@ -193,6 +192,7 @@ export const StudentDashboard = () => {
                     key={b.booking_id}
                     booking={b}
                     onCancel={handleCancelBooking}
+                    onOpenChoice={openChoice}
                     isCancelling={cancellingId === b.booking_id}
                   />
                 ))}

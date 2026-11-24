@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --color-pine-900: #16302A;
-  --color-pine-700: #1F4A3D;
-  --color-paper: #EFF1EC;
+  --color-pine-900: #172e25;
+  --color-pine-700: #24523d;
+  --color-paper: #f3f6f0;
   --color-paper-raised: #FFFFFF;
-  --color-marigold: #E8A23B;
-  --color-marigold-dark: #C9841F;
-  --color-indigo-500: #2B3A67;
-  --color-rust-alert: #B94A3C;
-  --color-success-moss: #4A7A5E;
-  --color-line-grey: #CBCFC7;
-  --color-ink-muted: #5B655F;
+  --color-marigold: #f6cb72;
+  --color-marigold-dark: #835206;
+  --color-indigo-500: #3b4c83;
+  --color-rust-alert: #a6372d;
+  --color-success-moss: #286346;
+  --color-line-grey: #dbe4da;
+  --color-ink-muted: #50665a;
 }
 
 /* Base resets & typography */
 html {
-  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 14px;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
   background-color: var(--color-paper);
   color: var(--color-pine-900);
 }
@@ -46,50 +46,101 @@ html {
   animation: marigold-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Route stroke animation on tracking screen */
-@keyframes routeStrokeAnim {
-  from {
-    stroke-dashoffset: 1000;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-.route-stroke-animated {
-  stroke-dasharray: 1000;
-  animation: routeStrokeAnim 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Vertical progress line fill animation */
-@keyframes verticalLineFill {
-  from {
-    height: 0%;
-  }
-  to {
-    height: 100%;
-  }
-}
-
-.route-progress-fill {
-  animation: verticalLineFill 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
-  .live-pulse {
-    animation: none !important;
-  }
-  .route-stroke-animated {
-    animation: none !important;
-    stroke-dashoffset: 0 !important;
-  }
-  .route-progress-fill {
-    animation: none !important;
-  }
+  .live-pulse { animation: none; }
 }
 
-/* Custom scrollbars that match the departure board aesthetic */
+/* Shared transit interface */
+body { background: var(--color-paper); }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+
+.transit-brand { display: inline-flex; align-items: center; gap: .7rem; font-size: 1.43rem; font-weight: 800; letter-spacing: -.05em; white-space: nowrap; }
+.brand-icon { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: .85rem; background: var(--color-marigold); color: var(--color-pine-900); flex: none; }
+.app-nav { border-bottom: 1px solid var(--color-line-grey); background: var(--color-paper-raised); }
+.app-nav-inner { width: min(100% - 2rem, 1360px); margin-inline: auto; min-height: 4.6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.nav-account { display: flex; align-items: center; gap: .65rem; min-width: 0; }
+.account-avatar { display: grid; place-items: center; width: 2.45rem; height: 2.45rem; flex: none; border-radius: 50%; background: #e6f1e9; color: #195842; font-weight: 800; }
+.nav-signout { display: inline-flex; align-items: center; gap: .45rem; flex: none; border: 1px solid var(--color-line-grey); border-radius: .7rem; padding: .55rem .7rem; font-size: .84rem; font-weight: 700; }
+.nav-signout:hover { background: var(--color-paper); }
+
+/* Sign in and registration */
+.auth-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100svh; gap: 2rem; padding: 1.1rem; }
+.auth-visual { position: relative; isolation: isolate; display: flex; min-height: 38rem; overflow: hidden; border-radius: 1.65rem; color: #fff; background: #0d352a; }
+.auth-visual::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, #0b2118aa 0%, transparent 32%, transparent 50%, #091d17aa 77%, #091d17eb 100%); }
+.auth-photo { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 57%; }
+.auth-visual-content { display: flex; flex: 1; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 2rem; padding: clamp(1.3rem, 4vw, 4rem); }
+.auth-caption p { font-size: clamp(2.5rem, 5.5vw, 6rem); line-height: .99; letter-spacing: -.065em; font-weight: 800; margin-bottom: 1rem; }
+.auth-caption span { color: #edf7ee; font-weight: 600; }
+.auth-form-area { display: grid; place-items: center; padding: 2rem clamp(1rem, 5vw, 5rem); }
+.auth-form { width: min(100%, 30rem); }
+.auth-form input { background: #fff; }
+.auth-demo { padding: .85rem; background: #ebf1ec; border-radius: .9rem; }
+
+/* Workspaces and content surfaces */
+.workspace { width: min(100% - 2rem, 1240px); margin: 0 auto; padding-block: 1.5rem 3.5rem; }
+.surface { min-width: 0; background: var(--color-paper-raised); border: 1px solid var(--color-line-grey); border-radius: 1.15rem; box-shadow: 0 2px 4px #17372b07, 0 6px 20px #17372b06; }
+.dashboard-hero { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 1.25rem; padding: clamp(1.45rem, 4vw, 3rem); border-radius: 1.25rem; background: linear-gradient(113deg, #10382c 0%, #154b38 62%, #215b45 100%); color: #fff; }
+.dashboard-hero::after { content: ''; position: absolute; z-index: -1; inset: 0; background: repeating-radial-gradient(ellipse at 87% 135%, transparent 0 2.8rem, #c7f1d115 2.82rem 2.9rem, transparent 2.96rem 4.5rem); pointer-events: none; }
+.dashboard-hero h1 { font-family: "Bricolage Grotesque", sans-serif; font-size: clamp(2rem, 4.6vw, 3.45rem); line-height: 1.05; letter-spacing: -.055em; font-weight: 800; }
+.hero-context { margin-top: .65rem; color: #d9f0e0; display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; }
+.hero-action { display: inline-flex; align-items: center; gap: .55rem; min-height: 2.65rem; padding: .35rem .8rem; background: #ffffff16; border: 1px solid #ffffff4d; border-radius: .7rem; color: #fff; font-weight: 700; }
+.hero-action:hover { background: #ffffff2b; }
+.commuter-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.panel-heading-icon { display: inline-grid; place-items: center; background: #e6f2e8; color: #17513c; width: 2.4rem; height: 2.4rem; border-radius: .75rem; flex: none; }
+.booking-board { overflow: hidden; }
+.booking-item { display: grid; grid-template-columns: minmax(13rem, 1.5fr) minmax(7.5rem, .8fr) minmax(7rem, 1fr) minmax(6.5rem, .7fr) auto; align-items: center; gap: .85rem; padding: 1rem 1.15rem; border-bottom: 1px solid var(--color-line-grey); }
+.booking-item:last-child { border-bottom: 0; }
+.booking-item:hover { background: #f7faf7; }
+.booking-time { display: flex; flex-direction: column; justify-content: center; width: 6.15rem; min-height: 3.45rem; padding: .45rem .55rem; flex: none; border-radius: .7rem; background: #eaf3ec; }
+.booking-filter { display: flex; flex-wrap: wrap; gap: .25rem; padding: .25rem; background: #e8eee9; border-radius: .75rem; }
+.booking-filter button { padding: .42rem .65rem; border-radius: .55rem; font-weight: 650; }
+.ride-option:has(input:checked) { background: #e9f4eb; border-color: #77ad8b; }
+.route-stops li { border: 1px solid var(--color-line-grey); border-radius: .75rem; padding: .85rem 1rem; background: #f6f9f6; }
+.route-stops li + li { margin-top: .55rem; }
+
+/* Staff screens */
+.admin-shell { display: grid; grid-template-columns: 13rem minmax(0, 1fr); width: min(100%, 1440px); margin-inline: auto; }
+.admin-sidebar { padding: 1.3rem .8rem; border-right: 1px solid var(--color-line-grey); }
+.admin-sidebar nav { display: flex; flex-direction: column; gap: .3rem; }
+.admin-sidebar button { display: flex; align-items: center; gap: .65rem; min-height: 2.65rem; padding: .45rem .65rem; white-space: nowrap; border-radius: .7rem; font-weight: 650; color: var(--color-ink-muted); }
+.admin-sidebar button:hover { background: #e8f0e9; color: var(--color-pine-900); }
+.admin-sidebar button[aria-current="page"] { background: #dcefe1; color: #174b35; }
+.admin-main { min-width: 0; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 4rem; }
+.admin-controls { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 1.1rem; }
+.admin-stat { border-top: 3px solid #6a9f7b; }
+.departure-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+.departure-slot { padding: .85rem 1rem; border-radius: .75rem; background: #edf5ee; }
+.data-table th { padding-block: .85rem; color: #325645; }
+.data-table tbody tr:last-child { border-bottom: 0; }
+.modal-surface { max-height: calc(100svh - 2rem); overflow-y: auto; }
+.run-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.run-grid > * { display: flex; flex-direction: column; }
+.run-grid > * > :last-child { margin-top: auto; }
+
+@media (max-width: 960px) {
+  .commuter-grid, .run-grid { grid-template-columns: minmax(0, 1fr); }
+  .booking-item { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; }
+}
+@media (max-width: 767px) {
+  .auth-layout { grid-template-columns: minmax(0,1fr); gap: 0; padding: .7rem; }
+  .auth-visual { min-height: clamp(13rem, 38vw, 20rem); border-radius: 1rem; }
+  .auth-photo { object-position: center 60%; }
+  .auth-caption p { font-size: clamp(2rem, 7vw, 3.5rem); margin-bottom: .45rem; }
+  .auth-form-area { padding: 1.7rem .75rem 2rem; }
+  .admin-shell { grid-template-columns: minmax(0,1fr); }
+  .admin-sidebar { border-right: 0; border-bottom: 1px solid var(--color-line-grey); padding: .6rem .8rem; }
+  .admin-sidebar nav { overflow-x: auto; flex-direction: row; }
+  .admin-main { padding-top: 1rem; }
+  .booking-item { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .booking-item > :first-child, .booking-item > :last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 430px) {
+  .departure-grid { grid-template-columns: 1fr; }
+  .workspace { width: calc(100% - 1.25rem); padding-top: .75rem; }
+  .nav-account .account-avatar { display: none; }
+}
+
+/* Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

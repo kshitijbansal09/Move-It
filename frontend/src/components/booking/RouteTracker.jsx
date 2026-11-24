@@ -1,64 +1,59 @@
 import React from 'react';
-import { Bus, User, Phone, CheckCircle, Clock, MapPin, ExternalLink } from 'lucide-react';
+import { Bus, User, Phone, MapPin, ExternalLink } from 'lucide-react';
 import { StatusDot } from '../common/StatusDot';
 import { getStationLocation } from '../../utils/stationLocations';
 
-/**
- * RouteTracker: Sequential transit route line visualization.
- * Uses numbered sequence markers ONLY here (1, 2, 3...) as required by the design system.
- * Features the ONE deliberate animated stroke fill on the route line.
- * Respects prefers-reduced-motion.
- */
-export const RouteTracker = ({
-  trip,
-  booking,
-  stops = [],
-  userStationId,
-}) => {
-  // If no detailed intermediate stops provided, build sequential corridor stops
-  const routeStops = stops.length > 0 ? stops : [
+const coordinates = (latitude, longitude) => {
+  if ([latitude, longitude].some(value => value == null || String(value).trim() === '')) return null;
+  const lat = Number(latitude);
+  const lon = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return [lat, lon].join(',');
+};
+
+export const RouteTracker = ({ trip, route }) => {
+  const stops = [
     {
-      station_id: trip?.start_station_id || 1,
-      name: trip?.start_station_name || 'Graphic Era University (Campus)',
-      time: trip?.departure_time
-        ? new Date(trip.departure_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-        : '08:00 AM',
-      status: 'passed',
+      label: 'Origin',
+      name: trip.start_station_name,
+      point: coordinates(route?.start_lat, route?.start_lon),
     },
     {
-      station_id: 2,
-      name: 'Clock Tower Hub',
-      time: '+18 min',
-      status: 'active',
-    },
-    {
-      station_id: trip?.end_station_id || 6,
-      name: trip?.end_station_name || 'Doiwala Terminal',
-      time: '+35 min',
-      status: 'upcoming',
+      label: 'Destination',
+      name: trip.end_station_name,
+      point: coordinates(route?.end_lat, route?.end_lon),
     },
   ];
+  const [origin, destination] = stops;
+  const directionsUrl = origin.point && destination.point
+    ? 'https://www.google.com/maps/dir/?' + new URLSearchParams({
+        api: '1',
+        origin: origin.point,
+        destination: destination.point,
+        travelmode: 'driving',
+      })
+    : null;
 
   return (
-    <div className="space-y-6 text-left">
+    <div className="commuter-grid text-left">
       {/* Trip Information Header */}
-      <div className="bg-paper-raised border border-line-grey p-5 sm:p-6 rounded">
+      <div className="surface p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line-grey pb-4">
           <div>
             <div className="text-xs font-medium text-ink-muted uppercase tracking-wider">
-              Transit Corridor Monitor
+              Assigned trip
             </div>
             <h1 className="font-display font-bold text-3xl tracking-condensed text-pine-900 mt-0.5">
-              {trip?.route_name || `${trip?.start_station_name} to ${trip?.end_station_name}`}
+              {trip?.route_name?.replace('<->', '↔') || `${trip?.start_station_name} to ${trip?.end_station_name}`}
             </h1>
             <div className="flex items-center gap-3 mt-1.5 text-xs text-ink-muted">
               <span>Trip #{trip?.trip_id}</span>
               <span>•</span>
-              <StatusDot status={trip?.status || 'scheduled'} isLive={trip?.status === 'scheduled'} />
+              <StatusDot status={trip?.status || 'scheduled'} />
             </div>
           </div>
 
-          <div className="text-left sm:text-right">
+          <div className="shrink-0 whitespace-nowrap text-left sm:text-right">
             <div className="text-xs text-ink-muted">Scheduled Departure</div>
             <div className="font-display font-bold text-2xl tracking-condensed text-pine-900">
               {trip?.departure_time
@@ -66,6 +61,7 @@ export const RouteTracker = ({
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: true,
+                    timeZone: 'Asia/Kolkata',
                   })
                 : '--:--'}
             </div>
@@ -109,105 +105,50 @@ export const RouteTracker = ({
         </div>
       </div>
 
-      {/* Sequential Route Stop Progression (Strictly for Sequential Content) */}
-      <div className="bg-paper-raised border border-line-grey p-5 sm:p-6 rounded">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-display font-bold text-xl tracking-condensed text-pine-900">
-            Route Stations & Sequence
-          </h2>
-          <div className="flex items-center gap-1.5 text-xs text-ink-muted">
-            <span className="w-2 h-2 rounded-full bg-marigold live-pulse" />
-            <span>Active valley corridor</span>
-          </div>
+      <section aria-labelledby="driving-route-title" className="surface p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h2 id="driving-route-title" className="font-display font-bold text-xl">Trip route</h2>
+          {directionsUrl && (
+            <a
+              href={directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded border border-pine-900 px-3 py-2 text-sm font-semibold hover:bg-paper"
+            >
+              <MapPin className="w-4 h-4" aria-hidden="true" />
+              Driving directions
+              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+            </a>
+          )}
         </div>
-
-        <div className="relative pl-2 sm:pl-4">
-          {/* Animated Route Line Stroke */}
-          <div className="absolute left-[19px] sm:left-[27px] top-4 bottom-6 w-0.5 bg-line-grey">
-            <div className="route-progress-fill w-full bg-marigold" />
-          </div>
-
-          {/* Sequential Stops */}
-          <div className="space-y-8 relative">
-            {routeStops.map((stop, index) => {
-              const stopNumber = index + 1;
-              const isStart = index === 0;
-              const isEnd = index === routeStops.length - 1;
-              const isUserStation = userStationId && Number(stop.station_id) === Number(userStationId);
-
-              return (
-                <div key={stop.station_id || index} className="flex items-start gap-4 sm:gap-6">
-                  {/* Numbered Sequence Marker (1, 2, 3...) ONLY allowed here */}
-                  <div
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center font-display font-bold text-sm shrink-0 z-10 transition-colors ${
-                      isStart
-                        ? 'bg-pine-900 border-pine-900 text-paper'
-                        : isEnd
-                        ? 'bg-marigold border-marigold-dark text-pine-900'
-                        : 'bg-paper-raised border-pine-900 text-pine-900'
-                    }`}
-                  >
-                    {stopNumber}
-                  </div>
-
-                  {/* Stop Name & Schedule Meta */}
-                  <div className="flex-1 pt-0.5">
-                    {(() => {
-                      const stopLoc = getStationLocation({ name: stop.name, latitude: stop.latitude, longitude: stop.longitude });
-                      return (
-                        <>
-                          <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-display font-bold text-lg sm:text-xl tracking-condensed text-pine-900">
-                                {stop.name}
-                              </span>
-                              <span className="text-[11px] font-medium text-indigo-500 bg-paper px-2 py-0.5 rounded border border-line-grey">
-                                {stopLoc.zone}
-                              </span>
-                              {isUserStation && (
-                                <span className="text-[11px] font-medium bg-marigold text-pine-900 px-2 py-0.5 rounded">
-                                  Your Boarding Hub
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <a
-                                href={stopLoc.mapUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] text-marigold-dark hover:text-pine-900 font-medium hover:underline"
-                                title="Open stop location on Google Maps"
-                              >
-                                <MapPin className="w-3 h-3" />
-                                <span>Map</span>
-                                <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
-                              <span className="text-xs font-mono text-ink-muted">
-                                {stop.time}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="text-xs text-pine-900 font-medium mt-0.5">
-                            {stopLoc.landmark}
-                          </div>
-
-                          <div className="text-[11px] text-ink-muted mt-0.5">
-                            {isStart && 'Origin terminal — departure checkpoint • '}
-                            {isEnd && 'Corridor terminus destination • '}
-                            {!isStart && !isEnd && 'Intermediate valley stop • '}
-                            <span>{stopLoc.description}</span>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
+        <ol className="route-stops">
+          {stops.map(stop => {
+            const location = stop.name ? getStationLocation({ name: stop.name }) : null;
+            return (
+              <li key={stop.label} className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs text-ink-muted">{stop.label}</p>
+                  <p className="font-display text-lg font-bold">{stop.name || 'Station unavailable'}</p>
+                  {location && <p className="text-xs text-ink-muted">{location.landmark}</p>}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+                {stop.point && (
+                  <a
+                    href={'https://www.google.com/maps/search/?' + new URLSearchParams({ api: '1', query: stop.point })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={'Open ' + stop.name + ' on Google Maps'}
+                    className="inline-flex items-center gap-1 text-xs font-medium hover:underline"
+                  >
+                    <MapPin className="w-3.5 h-3.5" aria-hidden="true" />
+                    Map
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        {!directionsUrl && <p className="mt-4 text-sm text-ink-muted">Driving directions are unavailable for this trip.</p>}
+      </section>
     </div>
   );
 };

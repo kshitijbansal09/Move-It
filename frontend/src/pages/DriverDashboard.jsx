@@ -91,26 +91,20 @@ export const DriverDashboard = () => {
     <div className="min-h-screen bg-paper text-pine-900 flex flex-col">
       <NavBar />
 
-      <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <main className="workspace flex-1 space-y-6">
         {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 border-b border-line-grey pb-4 text-left">
+        <div className="dashboard-hero">
           <div>
-            <div className="flex items-center gap-2">
-              <Bus className="w-5 h-5 text-pine-900" />
-              <h1 className="font-display font-bold text-3xl sm:text-4xl tracking-condensed text-pine-900 leading-tight">
-                Driver Operations
-              </h1>
-            </div>
-            <p className="text-xs text-ink-muted mt-1">
-              Active assigned transit runs • Graphic Era Fleet Control
-            </p>
+            <h1>Driver operations</h1>
+            <p className="hero-context"><Bus size={17} aria-hidden="true" /> Assigned campus runs</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {drivers.length > 1 && (
-              <div className="w-56">
+              <div className="w-56 max-w-full">
                 <Select
                   value={selectedDriverId}
+                  aria-label="Driver"
                   onChange={(e) => setSelectedDriverId(e.target.value)}
                   options={driverOptions}
                   placeholder="Select driver..."
@@ -122,7 +116,7 @@ export const DriverDashboard = () => {
                 setLoading(true);
                 fetchTrips();
               }}
-              className="inline-flex items-center gap-1.5 text-xs text-ink-muted hover:text-pine-900 py-1.5 px-3 rounded border border-line-grey hover:bg-paper-raised transition-colors"
+              className="hero-action"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span>Refresh runs</span>
@@ -132,7 +126,7 @@ export const DriverDashboard = () => {
 
         {/* Current Driver Roster Banner */}
         {currentDriver && (
-          <div className="bg-paper-raised border border-line-grey p-4 rounded text-left flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="surface p-5 text-left flex flex-wrap items-center justify-between gap-3 text-xs">
             <div>
               <span className="text-ink-muted">Assigned Driver: </span>
               <span className="font-medium text-pine-900 text-sm">{currentDriver.name}</span>
@@ -168,7 +162,7 @@ export const DriverDashboard = () => {
         <section aria-label="Assigned Runs" className="space-y-4 text-left">
           <div className="flex items-center justify-between">
             <h2 className="font-display font-bold text-2xl tracking-condensed text-pine-900">
-              Today's scheduled runs ({assignedTrips.length})
+              Scheduled runs ({assignedTrips.length})
             </h2>
             <div className="text-xs text-ink-muted">
               Click Start trip when departing terminal
@@ -176,11 +170,11 @@ export const DriverDashboard = () => {
           </div>
 
           {loading ? (
-            <div className="py-16 flex justify-center items-center bg-paper-raised border border-line-grey rounded">
+            <div className="surface py-16 flex justify-center items-center">
               <Spinner size="md" message="Loading assigned runs from fleet schedule..." />
             </div>
           ) : assignedTrips.length === 0 ? (
-            <div className="py-16 px-6 bg-paper-raised border border-line-grey rounded text-center">
+            <div className="surface py-16 px-6 text-center">
               <p className="text-base font-medium text-pine-900">
                 No trips currently assigned to this driver.
               </p>
@@ -189,7 +183,7 @@ export const DriverDashboard = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="run-grid">
               {assignedTrips.map((trip) => (
                 <TripCard
                   key={trip.trip_id}
