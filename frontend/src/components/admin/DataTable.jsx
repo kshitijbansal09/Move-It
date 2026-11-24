@@ -3,10 +3,6 @@ import { Button } from '../common/Button';
 import { Spinner } from '../common/Spinner';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 
-/**
- * Utilitarian departure-board data table for admin entities.
- * Hairline 1px dividers, sentence case headers, 13px table text.
- */
 export const DataTable = ({
   title,
   subtitle,
@@ -22,22 +18,22 @@ export const DataTable = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   return (
-    <div className="border border-line-grey bg-paper-raised rounded text-left">
+    <div className="surface data-table overflow-hidden text-left">
       {/* Table Header Bar */}
       <div className="p-4 sm:p-5 border-b border-line-grey flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h2 className="font-display font-bold text-2xl tracking-condensed text-pine-900 leading-tight">
               {title}
             </h2>
-            <span className="text-xs font-mono text-ink-muted px-2 py-0.5 bg-paper rounded border border-line-grey">
+            <span className="text-xs font-semibold text-ink-muted px-2.5 py-1 bg-paper rounded-full">
               {data.length} {data.length === 1 ? 'entry' : 'entries'}
             </span>
           </div>
           {subtitle && <p className="text-xs text-ink-muted mt-0.5">{subtitle}</p>}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {filterElement}
           {onAddNew && (
             <Button variant="primary" size="sm" onClick={onAddNew}>
@@ -87,7 +83,7 @@ export const DataTable = ({
                 return (
                   <tr
                     key={row.slot_id && row.station_id ? `${row.slot_id}-${row.station_id}` : rowId || rowIdx}
-                    className="border-b border-line-grey hover:bg-paper/40 transition-colors"
+                    className="border-b border-line-grey hover:bg-paper transition-colors"
                   >
                     {columns.map((col, colIdx) => (
                       <td key={colIdx} className="py-3 px-4 text-pine-900 align-middle">
