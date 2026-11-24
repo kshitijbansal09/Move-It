@@ -137,9 +137,19 @@ The console remains available separately with `make run`, and its original behav
 
 ### Data and behavior
 
-`sql/schema.sql` supplies the existing station, user, driver, vehicle, route, departure-slot, trip, booking and notification tables, plus relational constraints, capacity triggers and seed data. Slots remain 1:00 PM, 4:00 PM and 6:00 PM in Asia/Kolkata. A later request moves to the next slot; requests after 6:00 PM move to 1:00 PM the next day. Missing schedules return 422, full trips return 409, and demand below `LOW_DEMAND_THRESHOLD` (default 5) creates an in-app notice without cancelling the booking.
+`sql/schema.sql` supplies the existing station, user, driver, vehicle, route, departure-slot, trip, booking and notification tables, plus relational constraints, capacity triggers and seed data. Slots remain 1:00 PM, 4:00 PM and 6:00 PM in Asia/Kolkata. A request maps to the next departure at or after the preferred time. Requests after 6:00 PM map to 1:00 PM the next day. If today's mapped departure has passed, the request moves to the next college departure. Requests for a destination without a direct trip are counted and kept open while the rider reviews alternatives.
 
-Vehicle and driver uniqueness is enforced for each date/slot in MySQL. Maintenance/inactive buses cannot be allocated. Prepared statements bind every user value. Booking transactions lock the trip before claiming seats; SQL triggers enforce capacity and maintain occupancy on confirmation, cancellation, rejection, return to pending, and deletion. Booking details include departure, countdown, bus, driver/contact and route. Notifications, users, bookings and allocations survive server restarts. Web mode sends no WhatsApp messages.
+### Demand-based ride requests
+
+- Demand includes confirmed bookings, unexpired requests awaiting a choice, and the new request for that destination, travel date and slot. At `HIGH_DEMAND_THRESHOLD` (default 5), the new request confirms immediately if a seat is available. Existing requests awaiting a choice stay open until each commuter acts or the request expires.
+- Below the threshold the booking is saved as `awaiting_choice`. It adds to demand and leaves seat occupancy unchanged. The commuter can confirm a departure for the same destination, choose a nearby destination, or cancel. Choosing a trip explicitly confirms the booking if a seat is available, even at low demand.
+- Options show fresh rider counts and seat availability. Nearby departures are within 15 km and limited to the five nearest available options, with earlier departures first when distances match. The timetable also lists other scheduled college buses with available seats and shows where each bus goes. A full target returns HTTP 409 and the request stays open.
+- `AWAITING_CHOICE_TTL_MINUTES` defaults to 30. Requests expire at that deadline or the original departure, whichever comes first. A background worker cancels expired requests and records an in-app notice even when the rider has closed the browser.
+- Admin demand views count awaiting requests. The bookings table displays **Awaiting choice** separately from legacy **Pending** and **Confirmed**.
+
+Existing MySQL databases apply [003_demand_flow.sql](backend/src/models/migrations/003_demand_flow.sql) and [004_unassigned_ride_requests.sql](backend/src/models/migrations/004_unassigned_ride_requests.sql) once, in order. Stop the web server, select the configured database in the MySQL client, run each outstanding migration using the MySQL client's `source` command, and restart the updated server. Fresh databases use the updated schema via `make init-sql`.
+
+Vehicle and driver uniqueness is enforced for each date/slot in MySQL. Maintenance/inactive buses cannot be allocated. Prepared statements bind every user value. Booking transactions lock the trip before claiming seats; MySQL triggers check capacity and update occupancy when bookings enter or leave confirmed status, move between trips, or are deleted. Booking details include departure, countdown, bus, driver/contact and route. Notifications, users, bookings and allocations survive server restarts.
 
 ### Web modules
 
@@ -178,7 +188,9 @@ Success responses use `{ "success": true, "data": ... }`; errors use `{ "success
 | `/api/stations`, `/api/vehicles`, `/api/drivers`, `/api/routes` | Public reads and admin create/update/delete |
 | `/api/trips`, `/api/trips/:id` | Trip reads, admin date/slot allocation and driver status updates |
 | `POST /api/trips/:id/schedule-batch` | Existing C++ FCFS/priority allocation for pending bookings |
-| `/api/bookings`, `/api/bookings/request`, `/api/bookings/:id` | Own bookings, direct reservations, fixed-slot requests and departure details |
+| `GET /api/bookings`, `GET /api/bookings/:id`, `POST /api/bookings` | Own bookings, confirmed departure details and direct reservations |
+| `POST /api/bookings/request` | Takes `destination_station_id`, `date` (YYYY-MM-DD), `preferred_time` (HH:MM) and `priority`. Returns `confirmed` with departure details, `low_demand` with ride options, or `awaiting_choice` with options when demand meets the threshold and no direct bus is available. The legacy `requested_time` input is also accepted. |
+| `GET /api/bookings/:id/options`, `POST /api/bookings/:id/resolve` | Owner-only endpoints for an open request. Resolve with `choose_slot` and `slot_id`, `choose_nearby` with `destination_station_id` and `slot_id`, `choose_departure` with a scheduled destination and slot, or `cancel`. |
 | `PUT /api/bookings/:id/cancel`, `PUT /api/bookings/:id/status` | Owner cancellation and admin status changes |
 | `GET /api/notifications`, `PUT /api/notifications/:id/read` | Own inbox and mark-read action |
 | `GET /api/slots` | Three fixed departures for authenticated users |
@@ -188,6 +200,24 @@ Success responses use `{ "success": true, "data": ... }`; errors use `{ "success
 | `/api/users`, `/api/users/:id` | Admin listing/deletion and owner profile access/update |
 
 The admin date parameter is `?date=YYYY-MM-DD`; booking filters additionally support `station_id`, `slot_id` and `status`, and hourly demand accepts `station_id`.
+
+### Waiting for the original ride
+
+Choose **Wait for my preferred time** when requesting a ride, or **Keep my original request** from the alternatives. The request keeps its original destination, date and preferred time and contributes to hourly demand while open. The server checks for a bus after the configured choice window (30 minutes by default), including when the commuter is signed out. A match is a future campus departure to the requested destination, at the preferred time or a custom departure up to 30 minutes later on the same day. The rider receives an in-app update and must confirm an available seat.
+
+Admins can schedule a **Custom departure** from **Trips**. Before running this version against an existing C++ database, apply [005_original_ride_wait.sql](sql/005_original_ride_wait.sql) once. Fresh databases include the changes in the schema.
+
+### WhatsApp sandbox ride updates
+
+Add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_WHATSAPP_FROM` to the backend `.env`. Use the sandbox sender in `whatsapp:+…` format and join the sandbox from your own WhatsApp number. Set that number, including country code, as the test rider's contact number. Restart the web server from this directory, or set `MOVEIT_ENV_FILE` to the absolute path to this `.env` when launching it from another folder.
+
+For an existing C++ database, apply [006_whatsapp_updates.sql](sql/006_whatsapp_updates.sql) once before restarting. Opt in with **Send ride updates to my WhatsApp** when placing a request. Each new in-app ride notice is also queued for opted-in riders, including an acknowledgement when a preferred request is saved. A dedicated worker checks the queue every three seconds and also sends cancellation, rejection, departure and completion updates. Booking details show the latest submission status. Use Twilio Message Logs to check delivery or read receipts. Set `WHATSAPP_ENABLED=0` to disable sending or `WHATSAPP_SIMULATE=1` to exercise the queue without contacting Twilio. The legacy sandbox sends custom text during the 24-hour window opened by an inbound WhatsApp message. For the new Twilio trial, use the sender and pre-approved template SID shown in Try out WhatsApp. Set the SID as TWILIO_WHATSAPP_CONTENT_SID. Each alert uses that template text on WhatsApp, and the app inbox shows the full booking details. For live ride details outside the 24-hour window, use a registered WhatsApp sender and an approved Move It template. Set TWILIO_WHATSAPP_RIDE_CONTENT_SID to its HX ID. This takes precedence over TWILIO_WHATSAPP_CONTENT_SID. The first variable is the booking number and the second is the same ride update displayed in the app.
+
+Example utility template body:
+
+> Move It shuttle update for booking #{{1}}. Ride status update: {{2}} Open Move It to view your current booking.
+
+Example variables are 42 and Your shuttle request to Clock Tower is saved. Submit the template in Twilio's Content Template Builder and wait for WhatsApp approval before using its SID.
 
 ### Checks
 
@@ -199,4 +229,4 @@ make test-web
 cd frontend && npm run test:ui
 ```
 
-`make verify` still compares the original console with the console build, including all 15 original tests and 14 scripted sessions. `make test-web-unit` runs 22 checks for datetime/slot mapping, SQL-number conversion, password hashing and signed tokens without a database. `make test-web` requires a running MySQL server, the MySQL CLI, a built frontend and a database user allowed to create/drop test databases. It creates a unique `moveit_cpp_<number>_test` database, tests the C++ process over HTTP, and drops only that database during cleanup. Checks cover permissions, slots, notifications, low-demand boundaries, resource conflicts, concurrent capacity, CRUD and restart persistence.
+`make verify` still compares the original console with the console build, including all 15 original tests and 14 scripted sessions. `make test-web-unit` runs 22 checks for datetime/slot mapping, SQL-number conversion, password hashing and signed tokens without a database. `make test-web` requires a running MySQL server, the MySQL CLI, a built frontend and a database user allowed to create/drop test databases. It creates a unique `moveit_cpp_<number>_test` database, tests the C++ process over HTTP, and drops only that database during cleanup. Checks cover permissions, fixed slots, the demand boundary, option filtering and ordering, expiry, seat-count transitions, concurrent requests for the last seat, CRUD and restart persistence.
