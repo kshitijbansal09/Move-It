@@ -5,12 +5,13 @@
 namespace web {
 static Error sqlError(unsigned code,const std::string& message) {
     if(code==1062) {
-        if(message.find("unique_vehicle_slot")!=std::string::npos)return Error(409,"This bus is already allocated in that slot");
-        if(message.find("unique_driver_slot")!=std::string::npos)return Error(409,"This driver is already allocated in that slot");
+        if(message.find("unique_vehicle_slot")!=std::string::npos || message.find("unique_vehicle_departure")!=std::string::npos)return Error(409,"This bus is already allocated at that departure time");
+        if(message.find("unique_driver_slot")!=std::string::npos || message.find("unique_driver_departure")!=std::string::npos)return Error(409,"This driver is already allocated at that departure time");
         if(message.find("unique_user_trip")!=std::string::npos)return Error(409,"You already have a reservation for this trip.");
         return Error(409,"A record with this email, license or registration already exists.");
     }
     if(code==1644)return Error(409,message);
+    if(code==1205 || code==1213)return Error(409,"The booking changed while you were working. Please try again.");
     if(code==1451 || code==1452)return Error(400,"The referenced record does not exist or is still in use.");
     if(code==1045 || code==1049 || code==2002 || code==2003)return Error(503,"Cannot connect to MySQL. Check the C++ project's database configuration and run make init-sql.");
     std::cerr<<"[MySQL "<<code<<"] "<<message<<'\n';return Error(500,"The database operation could not be completed.");
@@ -104,7 +105,7 @@ void seedSchedule(Sql& sql) {
     int created=0;
     for(int day=0;day<7;day++)for(std::size_t si=0;si<slots.size();si++) {
         auto date=campusDate(std::time(nullptr)+day*86400);const auto& slot=slots[si];
-        auto allocated=sql.query("SELECT vehicle_id,driver_id,route_id FROM TRIP WHERE trip_date = ? AND slot_id = ?",{date,slot["slot_id"]});
+        auto allocated=sql.query("SELECT vehicle_id,driver_id,route_id FROM TRIP WHERE departure_time = ?",{date+" "+field(slot,"departure_time")});
         for(std::size_t ri=0;ri<routes.size();ri++) {
             bool exists=false;for(const auto& t:allocated)if(t["route_id"]==routes[ri]["route_id"])exists=true;if(exists)continue;
             Json vehicle=nullptr,driver=nullptr;
