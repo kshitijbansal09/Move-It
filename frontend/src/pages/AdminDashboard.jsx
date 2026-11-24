@@ -74,6 +74,7 @@ export const AdminDashboard = () => {
     driver_id: '',
     trip_date: campusDate(),
     slot_id: '',
+    custom_time: '',
     status: 'scheduled',
   });
 
@@ -118,7 +119,7 @@ export const AdminDashboard = () => {
   // Compute overview stats
   const stats = useMemo(() => {
     const activeTripsCount = trips.filter((t) => t.status === 'scheduled' || t.status === 'departed').length;
-    const pendingBookingsCount = bookings.filter((b) => b.status === 'pending').length;
+    const pendingBookingsCount = bookings.filter((b) => ['pending', 'awaiting_choice'].includes(b.status)).length;
 
     let totalSeats = 0;
     let filledSeats = 0;
@@ -150,12 +151,15 @@ export const AdminDashboard = () => {
       map[rName].filledSeats += t.seats_filled || 0;
     });
 
-    return Object.entries(map).map(([name, data]) => ({
-      name: name.length > 18 ? name.slice(0, 18) + '...' : name,
-      fullName: name,
-      occupancy: data.totalSeats > 0 ? Math.round((data.filledSeats / data.totalSeats) * 100) : 0,
-      seats: `${data.filledSeats}/${data.totalSeats}`,
-    }));
+    return Object.entries(map).map(([name, data]) => {
+      const label = name.replace(/^GEU Campus\s*<->\s*/, '');
+      return {
+        name: label.length > 21 ? label.slice(0, 20) + '…' : label,
+        fullName: name.replace('<->', '↔'),
+        occupancy: data.totalSeats > 0 ? Math.round((data.filledSeats / data.totalSeats) * 100) : 0,
+        seats: `${data.filledSeats}/${data.totalSeats}`,
+      };
+    });
   }, [trips]);
 
   // Trigger FCFS / Priority scheduling engine for a trip
@@ -203,6 +207,7 @@ export const AdminDashboard = () => {
         driver_id: drivers[0]?.driver_id ? String(drivers[0].driver_id) : '',
         trip_date: selectedDate,
         slot_id: slots[0]?.slot_id ? String(slots[0].slot_id) : '',
+        custom_time: '',
         status: 'scheduled',
       });
     }
@@ -253,7 +258,8 @@ export const AdminDashboard = () => {
         route_id: String(item.route_id),
         driver_id: String(item.driver_id),
         trip_date: item.trip_date || selectedDate,
-        slot_id: item.slot_id ? String(item.slot_id) : '',
+        slot_id: item.slot_id == null ? 'custom' : String(item.slot_id),
+        custom_time: item.departure_time?.slice(11, 16) || '',
         status: item.status,
       });
     }
@@ -339,7 +345,8 @@ export const AdminDashboard = () => {
           route_id: parseInt(tripForm.route_id, 10),
           driver_id: parseInt(tripForm.driver_id, 10),
           trip_date: tripForm.trip_date,
-          slot_id: Number(tripForm.slot_id),
+          slot_id: tripForm.slot_id === 'custom' ? null : Number(tripForm.slot_id),
+          ...(tripForm.slot_id === 'custom' && { departure_time: `${tripForm.trip_date}T${tripForm.custom_time}` }),
           status: tripForm.status,
         };
         if (editingItem) {
@@ -370,15 +377,18 @@ export const AdminDashboard = () => {
     <div className="min-h-screen bg-paper text-pine-900 flex flex-col">
       <NavBar />
 
-      <div className="flex-1 flex flex-col md:flex-row">
+      <div className="admin-shell flex-1">
         {/* Left Sidebar */}
         <Sidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
         {/* Admin Content Area */}
-        <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-          <div className="flex flex-wrap items-end gap-4 border-b border-line-grey pb-4">
-            <Input label="Schedule date" type="date" value={selectedDate} onChange={e => e.target.value && setSelectedDate(e.target.value)} required />
-            <Button variant="secondary" onClick={loadAllData} loading={loading}>Refresh board</Button>
+        <main className="admin-main space-y-6">
+          <div className="surface admin-controls p-5 sm:p-6">
+            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-condensed">Transit operations</h1>
+            <div className="flex flex-wrap items-end gap-3">
+              <Input label="Schedule date" type="date" value={selectedDate} onChange={e => e.target.value && setSelectedDate(e.target.value)} required />
+              <Button variant="secondary" onClick={loadAllData} loading={loading}>Refresh board</Button>
+            </div>
           </div>
           {/* Header notifications */}
           {errorNotice && (
@@ -402,18 +412,6 @@ export const AdminDashboard = () => {
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="space-y-6 text-left">
-              <div className="border-b border-line-grey pb-3">
-                <h1 className="font-display font-bold text-3xl sm:text-4xl tracking-condensed text-pine-900 leading-tight">
-                  Transit operations overview
-                </h1>
-                <p className="text-xs text-ink-muted mt-1">
-                  Graphic Era institutional fleet telemetry and corridor occupancy metrics
-                </p>
-              </div>
-
-              <SlotStrip slots={slots} summary={summary} loading={loading} />
-
-              {/* Big Barlow Condensed Stats (No Icon Boxes!) */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatBlock
                   value={stats.activeTripsCount}
@@ -437,8 +435,10 @@ export const AdminDashboard = () => {
                 />
               </div>
 
+              <SlotStrip slots={slots} summary={summary} loading={loading} />
+
               {/* Occupancy Per Route Recharts Bar Chart */}
-              <div className="border border-line-grey bg-paper-raised p-5 sm:p-6 rounded">
+              <div className="surface p-5 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
                   <div>
                     <h2 className="font-display font-bold text-2xl tracking-condensed text-pine-900 leading-tight">
@@ -449,7 +449,7 @@ export const AdminDashboard = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-ink-muted">
-                    <span className="w-3 h-3 bg-marigold rounded-xs" />
+                    <span className="w-3 h-3 bg-pine-700 rounded-sm" />
                     <span>Average seat occupancy %</span>
                   </div>
                 </div>
@@ -468,14 +468,14 @@ export const AdminDashboard = () => {
                         <CartesianGrid strokeDasharray="3 3" stroke="#CBCFC7" vertical={false} />
                         <XAxis
                           dataKey="name"
-                          tick={{ fill: '#5B655F', fontSize: 12, fontFamily: 'IBM Plex Sans' }}
+                          tick={{ fill: '#5B655F', fontSize: 12, fontFamily: 'DM Sans' }}
                           tickLine={false}
                           interval={0}
                         />
                         <YAxis
                           domain={[0, 100]}
                           unit="%"
-                          tick={{ fill: '#5B655F', fontSize: 11, fontFamily: 'IBM Plex Sans' }}
+                          tick={{ fill: '#5B655F', fontSize: 11, fontFamily: 'DM Sans' }}
                           tickLine={false}
                         />
                         <Tooltip
@@ -494,8 +494,8 @@ export const AdminDashboard = () => {
                         />
                         <Bar
                           dataKey="occupancy"
-                          fill="#E8A23B"
-                          radius={[2, 2, 0, 0]}
+                          fill="#377857"
+                          radius={[6, 6, 0, 0]}
                           maxBarSize={48}
                         />
                       </BarChart>
@@ -776,7 +776,7 @@ export const AdminDashboard = () => {
               filterElement={<div className="flex flex-wrap gap-2">
                 <Select label="Destination filter" value={bookingStationFilter} onChange={e => setBookingStationFilter(e.target.value)} placeholder={null} options={[{value:'',label:'All destinations'}, ...stations.map(s => ({value:String(s.station_id),label:s.name}))]} />
                 <Select label="Slot filter" value={bookingSlotFilter} onChange={e => setBookingSlotFilter(e.target.value)} placeholder={null} options={[{value:'',label:'All slots'}, ...slots.map(s => ({value:String(s.slot_id),label:s.label}))]} />
-                <Select label="Status filter" value={bookingStatusFilter} onChange={e => setBookingStatusFilter(e.target.value)} placeholder={null} options={['all','confirmed','pending','cancelled','rejected'].map(value => ({value,label:value === 'all' ? 'All statuses' : value[0].toUpperCase()+value.slice(1)}))} />
+                <Select label="Status filter" value={bookingStatusFilter} onChange={e => setBookingStatusFilter(e.target.value)} placeholder={null} options={['all','confirmed','awaiting_choice','pending','cancelled','rejected'].map(value => ({value,label:value === 'all' ? 'All statuses' : value[0].toUpperCase()+value.slice(1).replace('_', ' ')}))} />
               </div>}
               columns={[
                 { header: 'Ref #', accessor: 'booking_id' },
@@ -801,7 +801,7 @@ export const AdminDashboard = () => {
                   render: (b) => (
                     <div>
                       <div className="font-display font-bold text-sm tracking-condensed text-pine-900">
-                        {b.end_station_name}
+                        {b.destination || b.end_station_name}
                       </div>
                       <div className="text-[11px] text-ink-muted">{b.route_name}</div>
                     </div>
@@ -834,7 +834,7 @@ export const AdminDashboard = () => {
                 },
                 {
                   header: 'Status',
-                  render: (b) => <StatusDot status={b.status} isLive={b.status === 'confirmed'} />,
+                  render: (b) => <StatusDot status={b.status} label={b.status === 'awaiting_choice' && b.original_review_at ? 'Waiting for original ride' : undefined} />,
                 },
               ]}
             />
@@ -1056,7 +1056,8 @@ export const AdminDashboard = () => {
               />
             </div>
             <Input label="Departure date" type="date" value={tripForm.trip_date} onChange={e => setTripForm({ ...tripForm, trip_date: e.target.value })} required />
-            <Select label="Departure slot" value={tripForm.slot_id} onChange={e => setTripForm({ ...tripForm, slot_id: e.target.value })} options={slots.map(s => ({ value: String(s.slot_id), label: s.label }))} required />
+            <Select label="Departure slot" value={tripForm.slot_id} onChange={e => setTripForm({ ...tripForm, slot_id: e.target.value })} options={[...slots.map(s => ({ value: String(s.slot_id), label: s.label })), { value: 'custom', label: 'Custom departure' }]} required />
+            {tripForm.slot_id === 'custom' && <Input label="Custom departure time (India time)" type="time" value={tripForm.custom_time} onChange={e => setTripForm({ ...tripForm, custom_time: e.target.value })} required />}
             <Select
               label="Trip status"
               value={tripForm.status}
